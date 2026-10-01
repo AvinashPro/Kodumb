@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+:root {
+  --background: #030e1a;
+  /*--background: rgb(222,241,232);*/
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "VT323";
+}
+
+#game-container {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  place-items: center;
+  background: var(--background);
+  overflow: hidden;
+}
+
+canvas {
+  /*box-shadow: 0 0 50px rgba(255,255,255,0.05);*/
+  image-rendering: pixelated;
+}
+
+#dev, #dev2 {
+  position: absolute;
+  top: 5px;
+  left: 15px;
+  color: rgb(79,161,251);
+  font-size: 10px;
+  font-family: sans-serif;
+  user-select: none;
+}
+#dev2 {
+  top: 15px;
+}
+
+/*
+.joystick-base, .joystick-front {
+  border-radius: 100%;
+}
+.joystick-base {
+  position: absolute;
+  display: grid;
+  place-items: center;
+}
+.joystick-front {
+  position: absolute;
+  pointer-events: none;
+  /*transition: left 0.1s, top 0.1s;*/
+/*}*/
+/*
+.joystickBase {
+  display: grid;
+  place-items: center;
+  width: 100px;
+  height: 100px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 100%;
+  position: absolute;
+  left: 50px;
+  bottom: 50px;
+}
+.joystick {
+  border-radius: 100%;
+}*/
+
+
+#c1 {
+  position: absolute;
+  display: flex;
+  gap: 8px;
+  bottom: 40px;
+  left: 20px;
+}
+
+#c2 {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+}
+.game-btn {
+  display: grid;
+  place-items: center;
+  width: 45px;
+  height: 45px;
+  border-radius: 10px;
+  border: 0.5px solid rgba(53,114,225,0.4);
+  color: rgb(53,114,225);
+  font-size: 8px;
+  user-select: none;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+#up-btn {
+  position: absolute;
+  bottom: 60px;
+  left: 30px;
+}
+#left-btn,
+#right-btn {
+  position: absolute;
+  bottom: 15px;
+}
+#right-btn {
+  left: 60px;
+}
+#down-btn {
+  position: absolute;
+  left: 30px;
+  bottom: -30px;
+}

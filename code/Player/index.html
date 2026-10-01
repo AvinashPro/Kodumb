@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Hina+Mincho&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Iansui&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap');
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      font-family: "Sans-Serif";
+    }
+    body {
+      background: #010f1d;
+    }
+    .player {
+      position: relative;
+      width: 100vw;
+      max-width: 500px;
+      margin: auto;
+      min-height: 200px;
+      /*border: 1px solid rgba(163,194,254,0.1);*/
+    }
+    button {
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      border: none;
+      /*background: #bdf6ff;
+      background: rgb(180,218,223);*/
+      background: rgba(255,255,255,0.05);
+      margin: 20px auto;
+    }
+    #playSvg,
+    #pauseSvg
+    {
+      position: absolute;
+      transition: 0.3s;
+    }
+    .svg {
+      position: absolute;
+      transition: 0.3s;
+    }
+    .hide {
+      opacity: 0;
+    }
+    button svg {
+      width: 20px;
+      height: 20px;
+      /*fill: rgb(57,122,140);*/
+      fill: rgba(255,255,255,0.3);
+    }
+    .controller {
+      width: 90%;
+      max-width: 600px;
+      margin: auto;
+      margin-top: 50px;
+      height: 5px;
+      background: rgba(216,249,255,0.2);
+      border-radius: 10px;
+      touch-action: none;
+    }
+    .controller-knob {
+      position: relative;
+      width: 0;
+      background: rgba(216,249,255,0.4);
+      height: 100%;
+      border-radius: 10px;
+      touch-action: none;
+    }
+    .controller.seekStart .controller-knob {
+      background: rgba(216,249,255,0.7);
+    }
+    .controller-knob:before {
+      content: "";
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      transition: 0.2s;
+      background: #d2e8fd;
+      border-radius: 50%;
+      top: -2.5px;
+      right: -2.5px;
+      opacity: 0;
+      transform: scale(0.2);
+    }
+    .controller.seekStart .controller-knob:before {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .controller-knob p {
+      position: absolute;
+      right: -5px;
+      transform: translateY(0) scale(0.2);
+      opacity: 0;
+      color: #bddfff;
+      transition: 0.3s;
+      font-size: 12px;
+    }
+    
+    .flex {
+      width: 90%;
+      display: flex;
+      margin: auto;
+      justify-content: space-between;
+    }
+    /*#currentTime,
+    #duration {
+      font-size: 10px;
+      color: #e4f2ff;
+      margin-top: 5px;
+    }*/
+    
+    .currentTime-duration {
+      font-size: 10px;
+      color: #e4f2ff;
+      margin-top: 5px;
+    }
+    
+    
+    .controller.seekStart .controller-knob p {
+      transform: translateY(-20px) scale(1);
+      opacity: 1;
+    }
+    /*.controller.seekEnd .controller-knob p {
+      transform: translateY(0px) scale(0.2);
+      opacity: 0;
+    }*/
+    
+    
+    .music-name {
+      background: -webkit-linear-gradient(30deg, #bdf6ff, #f7feff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 600;
+      font-family: Sans-serif;
+      font-size: 24px;
+      margin-left: 10%;
+      margin-top: 20px;
+      
+      font-family: "Roboto Condensed";
+      font-style: normal;
+      font-weight: 500;
+      font-optical-sizing: auto;
+      font-size: 2em;
+      
+    }
+    
+    .lyrics {
+      min-height: 15px;
+    }
+    #lyrics,
+    #lyrics2
+    {
+      font-size:14px;
+      text-align:center;
+      font-family: Sans-Serif, cursive;
+    }
+    #lyrics {
+      /*font-family: "Iansui";*/
+      font-size: 18px;
+      font-weight: 300;
+    }
+    
+    .cover-image {
+      width: 100%;
+      display: block;
+      margin: auto;
+      border-radius: 10px;
+    }
+    
+    
+    .circle {
+      width: 100px;
+      height: 100px;
+      position: absolute;
+      top: -15%;
+      left: -10%;
+      border-radius: 50%;
+      filter: blur(100px);
+      background: rgb(64,226,255);
+      z-index: -1;
+    }
+    .circle:nth-child(2) {
+      background: rgb(64,255,215);
+      left: 80%;
+      top: 100%;
+    }
+    .lyrics-cont {
+      width: 100%;
+      height: 95vh;
+      max-height: 1000px;
+      /*border: 1px solid rgba(163,194,254,0.1);*/
+      padding: 10px;
+      margin-top: 15px;
+      overflow-y: scroll;
+      /*position: relative;*/
+    }
+    /*.lyrics-cont:before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100px;
+      background: green;
+      background: linear-gradient(0deg, transparent 80%, rgb(6,18,42));
+    }*/
+    .lyrics-cont > p {
+      background: -webkit-linear-gradient(30deg, #bdf6ff, #f7feff);
+      opacity: 0.5;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 600;
+      font-size:14px;
+      font-family: Sans-Serif;
+      transition: 0.3s;
+      margin-bottom: 5px;
+      will-change: transform;
+    }
+    .lyrics-cont > p.active {
+      opacity: 1;
+      transform: scale(1.2);
+      transform-origin: left;
+    }
+    .lyrics-cont.active > p {
+      opacity: 0.8;
+    }
+    
+    .songs-list img {
+      width: 80px;
+      border-radius: 10px;
+    }
+    .songs-list > div {
+      display: flex;
+      padding: 10px;
+      gap: 10px;
+      position: relative;
+    }
+    .songs-list > div:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      width: 80%;
+      height: 1px;
+      bottom: -1px;
+      transform: translateX(10%);
+      background: rgba(29,205,255,0.1);
+      
+    }
+    .gradient-text {
+      background: -webkit-linear-gradient(30deg, #bdf6ff, #f7feff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .song-name {
+      font-size: 24px;
+      font-weight: 600;
+    }
+    .song-artist {
+      font-size: 10px;
+      opacity: 0.7;
+      margin-top: 5px;
+    }
+    .songs-list {
+      min-height: 100vh;
+      /*overflow-y: scroll;*/
+      padding-bottom: 120px;
+    }
+    
+    #songs-list-1.searching > div {
+      display: none;
+    }
+    #songs-list-1.searching > div.found {
+      display: flex;
+    }
+    
+    .player-coverart {
+      width: 90%;
+      border-radius: 10px;
+      margin: auto;
+      display: block;
+    }
+    
+    
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0);
+      pointer-events: none;
+      z-index: 99;
+      transition: background 0.1s linear;
+    }
+    .drawer-container {
+      position: fixed;
+      inset: 0;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      overscroll-behavior-y: contain;
+      scrollbar-width: none;
+      z-index: 100;
+      pointer-events: none;
+      max-width: 600px;
+      margin: auto;
+    }
+    .drawer-container::-webkit-scrollbar {
+      display: none;
+    }
+    .snap-closed {
+      height: 120px;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      pointer-events: none;
+    }
+    .snap-peek {
+      height: calc(100vh - 120px);
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      pointer-events: none;
+    }
+    .drawer-sheet {
+      position: relative;
+      min-height: 100vh;
+      background: rgb(4,16,21);
+      border-top-left-radius: 25px;
+      border-top-right-radius: 25px;
+      box-shadow: 0 -10px 30px rgba(178,232,255,0.1);
+      color: #1c1c1e;
+      
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      pointer-events: auto;
+      padding-top: 10px;
+      overflow: hidden;
+    }
+    .drawer-handle {
+      width: 48px;
+      height: 3px;
+      background: rgba(178,252,255,0.6);
+      border-radius: 3px;
+      margin: 0 auto 16px auto;
+    }
+    
+    #bg-img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      filter: blur(60px) brightness(0.4);
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+    }
+    .drawer-sheet img {
+      /*transition: transform 0.1s;
+      transform-origin: 0 0;
+      will-change: transform;*/
+      transition: opacity 0.1s;
+      will-change: opacity;
+    }
+    .drawer-sheet .music-name {
+      transition: transform 0.1s;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+    /*.drawer-sheet.peek img {
+      transform: scale(0.3) translateX(-120px) translateY(-120px);
+    }
+    .drawer-sheet.peek .music-name {
+      transform: translateX(80px) scale(0.8);
+    }*/
+    
+    .card-container {
+      width: 100%;
+      min-height: 100%;
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory; 
+      scrollbar-width: none;
+      gap: 5px;
+    }
+    .card-container .card {
+      min-width: 100%;
+      min-height: 100%;
+      scroll-snap-align: start;
+    }
+    
+    .form-field {
+  display: flex;
+  flex-direction: column;
+}
+.form-field > div {
+  position: relative;
+  width: 90%;
+  max-width: 400px;
+  margin: 15px auto;
+}
+.form-field div label {
+  position: absolute;
+  bottom: 5px;
+  left: 15px;
+  color: rgb(111,149,212);
+  transition: 0.5s;
+  pointer-events: none;
+}
+.form-field input {
+  position: relative;
+  border: none;
+  outline: none;
+  width: 90%;
+  margin: auto;
+  display: block;
+  background: none;
+  padding: 5px;
+  color: #def3ff;
+  border-bottom: 1px solid rgb(52,80,126);
+  transition: 0.5s;
+}
+.form-field input:active,
+.form-field input:focus,
+.form-field input:valid
+{
+  border-color: rgb(54,129,255);
+}
+.form-field input:active ~ label,
+.form-field input:focus ~ label,
+.form-field input:valid ~ label
+{
+  left: 15px;
+  bottom: 25px;
+  font-size: 12px;
+  color: rgb(54,129,255);
+}
+    
+    
+  </style>
+</head>
+<body>
+  
+  
+  <div class="form-field">
+    <div>
+      <input type="text" id="search-bar" name="search-bar" required="">
+      <label for="search-bar">Search</label>
+    </div>
+  </div>
+  
+  <div class="songs-list" id="songs-list-1"></div>
+  
+  
+  <div class="backdrop" id="backdrop"></div>
+  <div class="drawer-container" id="drawer-container">
+    <div class="snap-closed"></div>
+    <div class="snap-peek"></div>
+    
+    <div class="drawer-sheet card-container" id="drawer-sheet">
+      
+      <div class="card">
+        <div id="bg-img"></div>
+        <div class="drawer-handle"></div>
+        <div id="player-3"></div>
+      </div>
+      <div class="card">
+                <div class="lyrics-cont" id="hello"></div>
+        
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  const drawerCont = document.querySelector("#drawer-container");
+  const backdrop = document.querySelector("#backdrop");
+
+  const PEEK_Y = 120;
+  const FULL_Y = window.innerHeight;
+  
+  /*window.addEventListener("DOMContentLoaded", () => {
+    drawerCont.scrollTop = PEEK_Y;
+  })*/
+  
+  drawerCont.addEventListener("scroll", () => {
+    const scrollTop = drawerCont.scrollTop;
+    
+    if(scrollTop >= FULL_Y - 100) {
+      backdrop.style.pointerEvents = "auto";
+    } else {
+      backdrop.style.pointerEvents = "none";
+    }
+    
+    const fullProgress = Math.max(0, (scrollTop - PEEK_Y) / (FULL_Y - PEEK_Y));
+    backdrop.style.background = `rgba(0,0,0,${fullProgress * 0.5}`;
+    /*
+    if(Math.abs(scrollTop - PEEK_Y) < 50) {
+      document.querySelector("#drawer-sheet").classList.add("peek");
+    } else {
+      document.querySelector("#drawer-sheet").classList.remove("peek");
+    }*/
+    
+    
+    const f = Math.max(0, Math.min(1, fullProgress));
+    const sheetImg = document.querySelector("#drawer-sheet img");
+    const sheetMusicName = document.querySelector("#drawer-sheet .music-name");
+    //sheetImg.style.transform = `scale(${0.7 * f + 0.3}) translateX(${120 * f - 120}px) translateY(${120 * f - 120}px)`;
+    sheetImg.style.opacity = f;
+    sheetMusicName.style.transform = `translateX(${80*(1-f)}px) scale(${1 - 0.2 * (1-f)})`;
+    
+    
+  })
+  
+  backdrop.addEventListener('click', () => {
+    drawerCont.scrollTo({ top: PEEK_Y, behavior: 'smooth' });
+  });
+  
+</script>
+<script type="module">
+  const svg_html = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" class="pauseSvg svg"><path d="M187.2 100.9C174.8 94.1 159.8 94.4 147.6 101.6C135.4 108.8 128 121.9 128 136L128 504C128 518.1 135.5 531.2 147.6 538.4C159.7 545.6 174.8 545.9 187.2 539.1L523.2 355.1C536 348.1 544 334.6 544 320C544 305.4 536 291.9 523.2 284.9L187.2 100.9z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" class="playSvg hide svg"><path d="M176 96C149.5 96 128 117.5 128 144L128 496C128 522.5 149.5 544 176 544L240 544C266.5 544 288 522.5 288 496L288 144C288 117.5 266.5 96 240 96L176 96zM400 96C373.5 96 352 117.5 352 144L352 496C352 522.5 373.5 544 400 544L464 544C490.5 544 512 522.5 512 496L512 144C512 117.5 490.5 96 464 96L400 96z"/></svg>`;
+  const helloElm = document.querySelector("#hello");
+  // 1. Assets and Player classes
+  class Assets {
+  
+  constructor() {
+    this.assets = new Map();
+  }
+
+  async load(data = []) {
+    await Promise.all(data.map(async (params) => {
+      const type = params.type;
+      let asset;
+      
+      switch(type) {
+        case "img": {
+          asset = new Image();
+          asset.src = params.url;
+          await asset.decode();
+          break;
+        }
+        case "audio": {
+          asset = new Audio();
+          asset.src = params.url;
+          await new Promise((resolve, reject) => {
+            asset.oncanplaythrough = resolve;
+            asset.onerror = () => reject(new Error(`Failed to load audio: ${params.key}`));
+          });
+          break;
+        }
+        case "json": {
+          const res = await fetch(params.url);
+          if (!res.ok) throw new Error(`Failed to fetch JSON: ${params.key}`);
+          asset = await res.json();
+          break;
+        }
+        case "text": {
+          const res = await fetch(params.url);
+          if (!res.ok) throw new Error(`Failed to fetch TEXT: ${params.key}`);
+          asset = await res.text();
+          break;
+        }
+      }
+
+      this.assets.set(params.key, asset);
+    }));
+
+    
+    return this.assets;
+  }
+
+  get(key) {
+    return this.assets.get(key);
+  }
+  
+}
+  class Music {
+    constructor() {
+      this.audio = new Audio();
+    }
+    async load(url) {
+      this.audio.src = url;
+      this.audio.preload = "auto";
+      this.audio.load();
+      await new Promise((res, rej) => {
+        this.audio.oncanplay = res;
+        this.audio.onerror = () => rej(new Error(`Failed to load music: ${url}`));
+      })
+    }
+    destroy() {
+      this.audio.pause();
+      this.audio.src = "";
+      this.audio.removeAttribute("src");
+      this.audio.load();
+    }
+  }
+  class Player {
+    
+    constructor(player, songs = {}) {
+      this.player = player;
+      this.songs = songs;
+      this.loader = new Assets();
+      /*setTimeout(() => {
+        this._set("I Wanna Be Yours", res.get("yours"))
+      }, 10000)*/
+      this.init();
+      
+      
+      
+      this._onTimeUpdate = () => this.timeupdate();
+      this._onDurationChange = () => this.durationchange();
+      this._onEnded = () => this.ended();
+      this._handlePpBtn = () => this.handlePpBtn();
+    }
+    
+    init() {
+      
+      this.main_audio = new Music();
+      
+      
+      this.player.classList.add("player");
+      let html = `
+      
+      
+        <img class="player-coverart" src="" />
+        <p class="music-name"></p>
+        
+
+        <div class="controller seekEnd">
+          <div class="controller-knob">
+            <p class="seek-time"></p>
+          </div>
+        </div>
+        
+        <div class="flex">
+          <div class="currentTime-duration currentTime"></div>
+          <div class="currentTime-duration duration"></div>
+        </div>
+        
+        <button class="ppBtn">${svg_html}</button>
+        
+      
+      
+      `;
+      
+      this.player.innerHTML = html;
+      
+      
+      const controller = this._get(".controller");
+      this.rect = controller.getBoundingClientRect();
+      
+      controller.addEventListener("pointerdown", e => this.seekStart(e, this));
+      controller.addEventListener("pointermove", e => this.seekMove(e, this));
+      controller.addEventListener("pointerup", e => this.seekEnd(e, this));
+      this._get(".ppBtn").addEventListener("click", () => this.handlePpBtn());
+      helloElm.addEventListener("click", e => {
+        //const idx = elm.attributes.idx.value;
+        if(e.target.tagName !== "P" || this.plainSubtitle) return;
+        
+        
+        const active_idx = this.lyricsData.findIndex(line => this.currentPlaying.currentTime >= line.time);
+        if(active_idx !== -1) helloElm.querySelector(`.lyric-${active_idx}`).classList.remove("active");
+        this.currentPlaying.currentTime = Number(e.target.attributes.time.value);
+        if(this.currentPlaying.paused) {
+          this.currentPlaying.play();
+          this.handlePpBtnSymbol();
+        }
+        
+      })
+    }
+    
+    _get(selector) {
+      return this.player.querySelector(selector);
+    }
+    
+    _set(name, music, cover, lrc = null) {
+      if(this.currentPlaying) this.destroy();
+      this.currentPlaying = music;
+      
+      
+      this._get(".music-name").textContent = name;
+      this._get(".currentTime").textContent = formatTime(music.currentTime);
+      this._get(".duration").textContent = formatTime(music.duration);
+      this._get("img").src = cover;
+      
+      if(!this._binded) {
+        this.main_audio.audio.addEventListener("timeupdate", this._onTimeUpdate ??= () => this.timeupdate());
+        this.main_audio.audio.addEventListener("durationchange", this._onDurationChange ??= () => this.durationchange());
+        this.main_audio.audio.addEventListener("ended", this._onEnded ??= () => this.ended());
+        this._binded = true;
+      }
+      
+      
+      
+      if(lrc) this.handleLyrics(lrc);
+    }
+    
+    handlePpBtn() {
+      //const m = this.currentPlaying;
+      this.currentPlaying.paused ? this.play() : this.pause();
+      //console.log("hello", m)
+      //document.body.append(m)
+      //const btn = this._get(".ppBtn");
+      /*if(!m.paused) {
+        m.pause();
+        this._get(".playSvg").classList.add("hide");
+        this._get(".pauseSvg").classList.remove("hide");
+      } else {
+        m.play();
+        this._get(".playSvg").classList.remove("hide");
+        this._get(".pauseSvg").classList.add("hide");
+      }*/
+    }
+    
+    handlePpBtnSymbol() {
+      const m = this.currentPlaying;
+      
+      if(m.paused) {
+        this._get(".playSvg").classList.add("hide");
+        this._get(".pauseSvg").classList.remove("hide");
+      } else {
+        this._get(".playSvg").classList.remove("hide");
+        this._get(".pauseSvg").classList.add("hide");
+      }
+    }
+    
+    seekStart(e, _this) {
+      _this._get(".controller").classList.add("seekStart");
+      _this.seeking = true;
+    }
+  
+    seekMove(e, _this) {
+      //_this.rect = this.controller.getBoundingClientRect();
+      const p = clamp((e.clientX - _this.rect.x) / _this.rect.width, 0, 1);
+      const time = p * _this.currentPlaying.duration;
+      _this._get(".controller-knob").style.width = p * 100 + "%";
+      _this._get(".seek-time").textContent = formatTime(time);
+    }
+  
+    seekEnd(e, _this) {
+      if(_this.lyricsData && !_this.plainSubtitle) {
+        const active_idx = _this.lyricsData.findIndex(line => _this.currentPlaying.currentTime >= line.time);
+        if(active_idx !== -1) helloElm.querySelector(`.lyric-${active_idx}`).classList.remove("active");
+      }
+      
+      _this.currentPlaying.currentTime = clamp(e.clientX - _this.rect.x, 0, _this.rect.width) / _this.rect.width * _this.currentPlaying.duration;
+      _this._get(".controller-knob").style.width = clamp(e.clientX - _this.rect.x, 0, _this.rect.width) + "px";
+      _this._get(".currentTime").textContent = formatTime(_this.currentPlaying.currentTime);
+      _this.seeking = false;
+      _this._get(".controller").classList.remove("seekStart");
+    }
+    
+    seekTo(t = 10) {
+      this.currentPlaying.currentTime += t;
+    }
+    
+    destroy() {
+      //const m = this.currentPlaying;
+      
+      /*m.pause();
+      m.removeEventListener("ended", this._onEnded);
+      m.removeEventListener("timeupdate", this._onTimeUpdate);
+      m.removeEventListener("durationchange", this._onDurationChange);*/
+      //this._get(".ppBtn").removeEventListener("click", this._handlePpBtn);
+      /*m.src = "";
+      m.removeAttribute("src");
+      m.load();*/
+      this._get(".playSvg").classList.add("hide");
+      this._get(".pauseSvg").classList.remove("hide");
+      this._get(".controller-knob").style.width = 0;
+      this.currentPlaying = null;
+      this.lyricsData = null;
+      this.plainSubtitle = null;
+      helloElm.classList.remove("active");
+      helloElm.innerHTML = "";
+    }
+    
+    timeupdate() {
+      
+      const m = this.currentPlaying;
+      const p = m.currentTime / m.duration;
+      if(!this.seeking) this._get(".controller-knob").style.width = p * 100 + "%";
+      this._get(".currentTime").textContent = formatTime(m.currentTime);
+      
+      if(this.lyricsData && !this.plainSubtitle) {
+        const active_idx = this.lyricsData.findIndex(line => this.currentPlaying.currentTime >= line.time);
+      /*console.clear()
+      console.log(active_idx);*/
+        if(active_idx !== -1) {
+          helloElm.querySelector(`.lyric-${active_idx}`).classList.add("active");
+          const p = helloElm.querySelector(`.lyric-${active_idx + 1}`);
+          if(p) p.classList.remove("active");
+        }
+      
+      }
+      
+      
+    }
+    
+    durationchange() {
+      this._get(".duration").textContent = formatTime(this.currentPlaying.duration);
+    }
+    
+    ended() {
+      this._get(".playSvg").classList.add("hide");
+      this._get(".pauseSvg").classList.remove("hide");
+    }
+    
+    handleLyrics(lrc) {
+      // .lrc file 
+      let html = "";
+      lrc = lrc.trim();
+      if(lrc[0] === "[" && !isNaN(lrc[1])) {
+        this.lyricsData = parseLrc(lrc);
+      } else if(lrc[0] == "1") {
+        const arr = lrc.split("\n");
+        this.lyricsData = [];
+        for(let idx = arr.length - 1; idx >= 0; idx -= 4) {
+          let obj = {};
+          obj.line = arr[idx].trim();
+          obj.time = convertToSeconds(arr[idx - 1].split(" --> ")[0].replace(/,/, "."));
+          this.lyricsData.push(obj);
+        }
+      } else {
+        this.plainSubtitle = true;
+        lrc.split("\n").forEach(line => {
+          line.length === 0 ? html += `<br>` : html += `<p>${line}</p>`;
+        })
+        helloElm.classList.add("active");
+        helloElm.innerHTML = html;
+        return;
+      }
+      
+      for(let idx = this.lyricsData.length - 1; idx >= 0; idx--) {
+        const { line, time } = this.lyricsData[idx];
+        html += `<p class="lyric-${idx}" time="${time}">${line}</p>`;
+      }
+      
+      helloElm.innerHTML = html;
+      //helloElm.addEventListener("click")
+      
+      //console.log(html)
+      //console.log(data)
+      
+    }
+    
+    play() {
+      this.currentPlaying.play();
+      this._get(".playSvg").classList.remove("hide");
+      this._get(".pauseSvg").classList.add("hide");
+    }
+    
+    pause() {
+      this.currentPlaying.pause();
+      this._get(".playSvg").classList.add("hide");
+      this._get(".pauseSvg").classList.remove("hide");
+    }
+    
+  }
+
+  // 2. Loading the resources
+  const res = new Assets();
+  const _my_data = [
+    { key: "music_list", url: "res/data.json", type: "json" }
+  ];
+  await res.load(_my_data);
+  
+  // 3. DOM elements selection 
+  const songListElm = document.querySelector("#songs-list-1");
+  const playerElm = document.querySelector("#player-3");
+  const sheetBgImg = document.querySelector("#bg-img");
+  
+  const defaultUrl = "https://d1csarkz8obe9u.cloudfront.net/posterpreviews/cold-night-album-cover-design-template-f4373773b6a4babb5a33af50b3f4725e_screen.jpg?ts=1698203459";
+  
+  // 4. Some utility and functionality functions
+  function parseLrc(lrc) {
+    lrc = lrc.replace(/\[/g, "");
+    lrc = lrc.split("\n");
+    const data = [];
+    
+    for(let idx = 0; idx < lrc.length; idx++) {
+      if(lrc[idx].trim().length === 0) continue;
+      let d = lrc[idx].split("]");
+      data.push({
+        time: convertToSeconds(d[0]),
+        line: d[1].trim()
+      });
+    }
+    
+    return data.sort((a, b) => b.time - a.time);
+  }
+  
+  function clamp(x, min, max) {
+    return Math.max(0, Math.min(x, max));
+  }
+  // 324.56 (seconds) -> 05:24
+  function formatTime(sec) {
+    let s = sec % 60;
+    let min = (sec - s) / 60;
+    let m = min % 60;
+    let h = (min - m) / 60;
+    s = Math.floor(s);
+    
+    if(h > 0) return h.toString().padStart(2, "0") + ":" + m.toString().padStart(2, "0") + ":" + s.toString().padStart(2, "0");
+    return m.toString().padStart(2, "0") + ":" + s.toString().padStart(2, "0");
+  }
+  // 05:24 -> 324 (seconds)
+  function convertToSeconds(time) {
+    let t = time.split(":");
+    if(t.length > 2) return Number(t[0]) * 3600 + Number(t[1]) * 60 + Number(t[2]);
+    return Number(t[0]) * 60 + Number(t[1]);
+  }
+  
+  async function fetchCoverArt(query, high_res = true) {
+    if (!query) return;
+
+    try {
+      const response = await fetch(
+        `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=1`
+      );
+
+      if (!response.ok) {
+        console.log(`Failed to fetch cover art: ${query}`);
+        return defaultUrl;
+      }
+      
+      const data = await response.json();
+      if (data.results && data.results.length > 0) {
+        const track = data.results[0];
+        if(!high_res) return track.artworkUrl100;
+        const highResArtUrl = track.artworkUrl100.replace('100x100bb', '600x600bb');
+        //const releaseYear = track.releaseDate ? new Date(track.releaseDate).getFullYear() : '';
+        
+        return highResArtUrl;
+        // track.trackName;
+        // track.artistName;
+        // track.collectionName
+        // releaseYear
+      } else {
+        return defaultUrl;
+      }
+      
+    } catch (err) {
+        console.log(`Some error occured while trying to fetch cover art: ${query}. Error: ${err}`);
+        return defaultUrl;
+    }
+  }
+  
+  
+  function updateSongList(player) {
+    player.filteredSongs = [];
+    for(const [category, array] of Object.entries(player.songs)) {
+      
+      // filter here
+      array.forEach(entry => {
+        player.filteredSongs.push(entry);
+      })
+      
+    }
+    
+    
+    //player.currentSongIdx = 0;
+    
+    let html = "";
+    player.filteredSongs.forEach((song, idx) => {
+      
+    
+      html += `
+        <div id="sl-${idx}" idx="${idx}">
+          <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU4CHYG6s4piC0RFDg-YtOTSbwN0jrfu3C_cg3zUa9Lw&s=10" alt="cover" idx="${idx}">
+           <div idx="${idx}">
+             <p class="song-name gradient-text" idx="${idx}">${song.name}</p>
+             <p class="song-artist gradient-text" idx="${idx}">${song.artist ? song.artist : ""}</p>
+       </div>
+      </div>`;
+    })
+    
+    songListElm.innerHTML = html;
+    
+    let imgs = songListElm.querySelectorAll("img");
+    player.filteredSongs.forEach((song, idx) => {
+      if(!song.cover) {
+        let q = song.artist ? (song.name+" "+song.artist) : song.name;
+        fetchCoverArt(q).then(u => {
+          song.cover = u;
+          imgs[idx].src = u;
+        })
+      } else {
+        imgs[idx].src = song.cover;
+      }
+    })
+    
+    
+  }
+  
+  
+  
+  // 5. player creation 
+  const myPlayer = new Player(playerElm, res.get("music_list"));
+  updateSongList(myPlayer);
+  console.log(myPlayer);
+  
+  
+  
+  //const main_audio = new Music();
+  
+  // 6. addEventListener to song list (and then play the selected song)
+  
+  songListElm.addEventListener("click", async function(e) {
+    const song = myPlayer.filteredSongs[e.target.attributes.idx.value];
+    const n = song.name;
+    
+    if(n === myPlayer.currentPlayingName) {
+      drawerCont.scrollTo({
+        top: PEEK_Y, behavior: "smooth"
+      });
+      return;
+    }
+    
+    myPlayer.currentPlayingName = n;
+
+    
+    myPlayer.main_audio.destroy();
+    await myPlayer.main_audio.load(song.url);
+    
+    if(song.lrc) {
+      await res.load([{ key: n+"-lrc", url: song.lrc, type: "text" }]);
+    }
+    
+    myPlayer._set(n, myPlayer.main_audio.audio, song.cover, res.get(n+"-lrc"));
+    myPlayer.play();
+    drawerCont.scrollTo({
+      top: PEEK_Y, behavior: "smooth"
+    });
+    
+    
+    sheetBgImg.style.backgroundImage = `url("${song.cover}")`;
+    
+  })
+  
+  
+  
+  const searchBar = document.querySelector("#search-bar");
+  searchBar.addEventListener("input", () => {
+    
+    if(searchBar.value.length !== 0) {
+      songListElm.classList.add("searching");
+    } else {
+      songListElm.classList.remove("searching");
+    }
+    
+    myPlayer.filteredSongs.forEach((song, idx) => {
+      
+      const artist = song.artist ? song.artist.toLowerCase() : "";
+      
+      if(song.name.toLowerCase().includes(searchBar.value.toLowerCase()) || artist.includes(searchBar.value.toLowerCase())) {
+        //console.log(song.name)
+        songListElm.querySelector("#sl-"+idx).classList.add("found");
+      } else {
+        songListElm.querySelector("#sl-"+idx).classList.remove("found");
+      }
+      
+    })
+    
+  })
+  
+  const sheetImg = document.querySelector("#drawer-sheet img");
+  sheetImg.addEventListener("dblclick", e => {
+    if(e.clientX < window.innerWidth/2) {
+      myPlayer.seekTo(-10);
+    } else {
+      myPlayer.seekTo(10);
+    }
+  })
+  
+</script>
+
+</body>
+</html>

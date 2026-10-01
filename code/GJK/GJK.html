@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>GJK</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: rgb(10,20,30);
+    }
+    #infoElm {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #09f;
+      mix-blend-mode: difference;
+      /*background: rgb(10,20,30);*/
+    }
+    canvas {
+      touch-action: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas></canvas>
+  <p id="infoElm"></p>
+<script>
+
+
+const canvas = document.querySelector("canvas");
+const ctx = canvas.getContext("2d");
+function setCanvasSize(w = window.innerWidth, h = window.innerHeight) {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+};
+window.addEventListener("resize", () => { setCanvasSize(); });
+setCanvasSize();
+
+
+class vec3 {
+  constructor(x = 0, y = 0, z = 0) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    this.z += v.z;
+    return this;
+  }
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    this.z -= v.z;
+    return this;
+  }
+  scale(k) {
+    this.x *= k;
+    this.y *= k;
+    this.z *= k;
+    return this;
+  }
+  clone() {
+    return new vec3(this.x, this.y, this.z);
+  }
+  copy(v) {
+    this.x = v.x;
+    this.y = v.y;
+    this.z = v.z;
+    return this;
+  }
+  set(x, y, z = null) {
+    this.x = x;
+    this.y = y;
+    this.z = z ?? this.z;
+    return this;
+  }
+  dot(v) {
+    return this.x * v.x + this.y * v.y + this.z * v.z;
+  }
+  cross(v, d = new vec3()) {
+    d.x = this.y * v.z - v.y * this.z;
+    d.y = - this.x * v.z + v.x * this.z;
+    d.z = this.x * v.y - v.x * this.y;
+    return d;
+  }
+  rotateZ(angle, v = this) {
+    const sin = Math.sin(angle);
+    const cos = Math.cos(angle);
+    const { x, y } = this;
+    v.x = x * cos - y * sin;
+    v.y = x * sin + y * cos;
+    return v;
+  }
+}
+
+class Polygon {
+  static _id = 0;
+  constructor(vertices, params = {}) {
+    this.id = Polygon._id++;
+    this.vertices = vertices;
+    this.worldVertices = [];
+    for(let i = 0; i < this.vertices.length; i++) {
+      this.worldVertices.push(new vec3());
+    };
+    this.pos = new vec3(params.x ?? 0, params.y ?? 0, params.z ?? 0);
+    this.angle = params.angle ?? 0;
+    this.angVel = params.angVel ?? 0;
+    this.color = params.color || "#09f";
+  }
+  
+  computeWorldVertices() {
+    this.worldVertices.forEach((v, i) => {
+      this.vertices[i].rotateZ(this.angle, v).add(this.pos);
+    });
+    return this.worldVertices;
+  }
+  
+  render(ctx) {
+    ctx.beginPath();
+    ctx.strokeStyle = this.color;
+    ctx.moveTo(0, 0);
+    for(const vertex of this.vertices) {
+      ctx.lineTo(vertex.x, vertex.y)
+    }
+    ctx.lineTo(this.vertices[0].x, this.vertices[0].y);
+    ctx.stroke();
+    ctx.closePath();
+  }
+  
+  update(dt) {
+    this.angle += this.angVel * dt;
+  }
+  
+}
+
+
+class GJK {
+  constructor() {
+  }
+  
+  static dir = new vec3();
+  static p1 = new vec3();
+  static p2 = new vec3();
+  static simplex = [new vec3(), new vec3(), new vec3(), new vec3()];
+  static simplexLength = 0;
+  
+  
+  static support(verticesA, verticesB, direction) {
+    const dir = direction.clone();
+    
+    GJK.p1.set(0, 0, 0);
+    GJK.p2.set(0, 0, 0);
+    let dotVal = -Infinity;
+    for(const v1 of verticesA) {
+      const dot = v1.dot(dir);
+      if(dot > dotVal) {
+        GJK.p1.copy(v1);
+        dotVal = dot;
+      }
+    }
+    
+    dir.scale(-1);
+    dotVal = -Infinity;
+    for(const v2 of verticesB) {
+      const dot = v2.dot(dir);
+      if(dot > dotVal) {
+        GJK.p2.copy(v2);
+        dotVal = dot;
+      }
+    }
+    
+    return GJK.p1.sub(GJK.p2);
+  }
+  
+  static pushToSimplex(point) {
+    //if(GJK.simplexLength >= 4) return;
+    GJK.simplex[GJK.simplexLength].copy(point);
+    GJK.simplexLength++;
+  }
+  
+  static removeLastAddedFromSimplex() {
+    //GJK.simplex[GJK.simplexLength - 1].set(0, 0, 0);
+    GJK.simplexLength--;
+  }
+  
+  static check(verticesA, verticesB) {
+    GJK.dir.set(1, 0, 0);
+    GJK.simplexLength = 0;
+    const support = GJK.support(verticesA, verticesB, GJK.dir);
+    GJK.pushToSimplex(support);
+    GJK.dir.copy(support.scale(-1));
+    
+    while(true) {
+      support.copy(GJK.support(verticesA, verticesB, GJK.dir));
+      if(support.dot(GJK.dir) <= 0) return false;
+      GJK.pushToSimplex(support);
+      if(GJK.NextSimplex()) return true;
+    }
+    
+  }
+  
+  static NextSimplex() {
+    switch (GJK.simplexLength) {
+      case 2: return GJK.Line();
+      case 3: return GJK.Triangle();
+      case 4: return GJK.Tetrahedron();
+    }
+    return false;
+  }
+  
+  static sameDirection(v1, v2) {
+    return v1.dot(v2) > 0;
+  }
+  
+  static Line() {
+    const a = GJK.simplex[1];
+    const b = GJK.simplex[0];
+    
+    const ab = b.clone().sub(a);
+    const ao = a.clone().scale(-1);
+    if(GJK.sameDirection(ab, ao)) {
+      ab.cross(ao).cross(ab, GJK.dir);
+    } else {
+      GJK.simplex[0].copy(a);
+      GJK.simplexLength = 1;
+      GJK.dir.copy(ao);
+    }
+    return false;
+  }
+  
+  static Triangle() {
+    const a = GJK.simplex[2];
+    const b = GJK.simplex[1];
+    const c = GJK.simplex[0];
+    
+    const ab = b.clone().sub(a);
+    const ac = c.clone().sub(a);
+    const ao = a.clone().scale(-1);
+    const abc = ab.cross(ac);
+    const abPerp = ab.cross(abc);
+    const acPerp = abc.cross(ac);
+    if(GJK.sameDirection(acPerp, ao)) {
+      if(GJK.sameDirection(ac, ao)) {
+        GJK.simplex[0].copy(c);
+        GJK.simplex[1].copy(a);
+        GJK.simplexLength = 2;
+        ac.cross(ao).cross(ac, GJK.dir);
+      } else {
+        GJK.simplex[0].copy(b);
+        GJK.simplex[1].copy(a);
+        GJK.simplexLength = 2;
+        return GJK.Line();
+      }
+    } else if(GJK.sameDirection(abPerp, ao)) {
+      GJK.simplex[0].copy(b);
+      GJK.simplex[1].copy(a);
+      GJK.simplexLength = 2;
+      return GJK.Line();
+    } else {
+      return true;
+    }
+    return false;
+  }
+  
+  static Tetrahedron() {
+    const a = GJK.simplex[3];
+    const b = GJK.simplex[2];
+    const c = GJK.simplex[1];
+    const d = GJK.simplex[0];
+    
+    const ab = b.clone().sub(a);
+    const ac = c.clone().sub(a);
+    const ad = d.clone().sub(a);
+    const ao = a.clone().scale(-1);
+    const abc = ab.cross(ac);
+    const acd = ac.cross(ad);
+    const adb = ad.cross(ab);
+    
+    if(GJK.sameDirection(abc, ao)) {
+      GJK.simplex[0].copy(c);
+      GJK.simplex[1].copy(b);
+      GJK.simplex[2].copy(a);
+      GJK.simplexLength = 3;
+      return GJK.Triangle();
+    }
+    
+    if(GJK.sameDirection(acd, ao)) {
+      GJK.simplex[0].copy(d);
+      GJK.simplex[1].copy(c);
+      GJK.simplex[2].copy(a);
+      GJK.simplexLength = 3;
+      return GJK.Triangle();
+    }
+    
+    if(GJK.sameDirection(adb, ao)) {
+      GJK.simplex[0].copy(b);
+      GJK.simplex[1].copy(d);
+      GJK.simplex[2].copy(a);
+      GJK.simplexLength = 3;
+      return GJK.Triangle();
+    }
+    
+    return true;
+    
+  }
+  
+}
+
+
+
+
+
+function generateRegularPolyVertices(n, r = 30) {
+  const vertices = [];
+  const t = Math.PI * 2 / n;
+  for(let i = 0; i < n; i++) {
+    vertices.push(new vec3(Math.cos(i * t) * r, Math.sin(i * t) * r));
+  }
+  return vertices;
+}
+function randint(min, max) {
+  return Math.floor((max + 1 - min) * Math.random()) + Math.floor(min);
+}
+
+const entities = [];
+let ZOOM = 1;
+let z = ZOOM * (window.devicePixelRatio || 1);
+
+for(let i = 0; i < 10; i++) {
+  entities.push(new Polygon(
+    generateRegularPolyVertices(randint(3, 7), randint(40, 70)),
+  {
+    x: randint(0, canvas.clientWidth),
+    y: randint(0, canvas.clientHeight),
+    angVel: randint(-0.5, 0.5)
+  }));
+}
+
+
+let t0 = performance.now();
+let t1 = t0, frames = 0, fps;
+const infoElm = document.querySelector("#infoElm");
+function loop(t) {
+  requestAnimationFrame(loop);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  z = ZOOM * (window.devicePixelRatio || 1);
+  ctx.setTransform(z, 0, 0, z, 0, 0);
+  dt = (t - t0) * 0.001;
+  t0 = t;
+  frames++;
+  if(t - t1 >= 1000) {
+    fps = frames;
+    t1 = t;
+    infoElm.textContent = fps;
+    frames = 0;
+  }
+
+  for(const e of entities) {
+    e.color = "#09f";
+    e.update(dt);
+    e.computeWorldVertices();
+  }
+  
+  for(const e of entities) {
+    
+    for(const f of entities) {
+      if(e.id <= f.id) {
+        if(GJK.check(e.worldVertices, f.worldVertices)) {
+          e.color = "#f04";
+          f.color = "#f04";
+        }
+      }
+    }
+    
+    const sin = Math.sin(e.angle);
+    const cos = Math.cos(e.angle);
+    ctx.setTransform(cos * z, sin * z, - sin * z, cos * z, e.pos.x * z, e.pos.y * z);
+    e.render(ctx);
+  }
+  
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+requestAnimationFrame(loop);
+
+window.addEventListener("pointermove", e => {
+  entities[0].pos.set(e.clientX, e.clientY);
+})
+
+</script>
+</body>
+</html>

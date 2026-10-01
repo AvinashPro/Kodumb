@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title> 
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+    overscroll-behavior-y: none;
+    }
+    body {
+      width: 100vw;
+      height: 100vh;
+      background: rgb(2,5,13);
+      display: grid;
+      place-items: center;
+    }
+    #fps {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-family: Sans-Serif;
+      color: rgb(126,156,238);
+    }
+  </style>
+</head>
+<body>
+  <canvas>
+    
+  </canvas>
+  <div id="fps"></div>
+<script>
+  
+class Grid {
+  
+  constructor(cellSize = 32) {
+    this._cellSize = cellSize;
+    this.inv = 1 / cellSize;
+    this.cells = new Map();
+  }
+
+  set cellSize(val) {
+    this._cellSize = val;
+    this.inv = 1 / val;
+  }
+
+  get cellSize() {
+    return this._cellSize;
+  }
+
+  insert(entity, x, y, w = 0, h = 0) {
+    const cx_min = Math.floor(x * this.inv),
+          cx_max = Math.floor((x + w) * this.inv),
+          cy_min = Math.floor(y * this.inv),
+          cy_max = Math.floor((y + h) * this.inv);
+    
+    for(let cy = cy_min; cy <= cy_max; cy++) {
+      let row = this.cells.get(cy);
+      if(!row) {
+        row = new Map();
+        this.cells.set(cy, row);
+      }
+      
+      for(let cx = cx_min; cx <= cx_max; cx++) {
+        let cell = row.get(cx);
+        if(!cell) {
+          cell = [];
+          row.set(cx, cell);
+        }
+        cell.push(entity);
+      }
+    }
+  }
+
+  clear() {
+    this.cells.clear();
+  }
+
+  query(x, y, w, h, extra = 0) {
+    const result = new Set();
+    
+    const cx_min = Math.floor(x * this.inv) - extra,
+          cx_max = Math.floor((x + w) * this.inv) + extra,
+          cy_min = Math.floor(y * this.inv) - extra,
+          cy_max = Math.floor((y + h) * this.inv) + extra;
+    
+    
+    for(let cy = cy_min; cy <= cy_max; cy++) {
+      const row = this.cells.get(cy);
+      if(!row) continue;
+      for(let cx = cx_min; cx <= cx_max; cx++) {
+        const entities = row.get(cx);
+        if(!entities) continue;
+        for(const e of entities) result.add(e);
+      }
+    }
+
+    return [...result];
+    
+  }
+
+  // only for debugging
+  getObject() {
+    const str = JSON.stringify(this.cells, (key, value) => {
+      if (value instanceof Map) {
+        return Object.fromEntries(value); 
+      }
+      return value;
+    });
+
+    return JSON.parse(str);
+  }
+  
+  
+}
+const grid = new Grid();
+
+const canvas = document.querySelector("canvas");
+const ctx = canvas.getContext("2d");
+const dpr = window.devicePixelRatio || 1;
+const w = innerWidth;
+const h = innerHeight;
+
+canvas.width = w*dpr;
+canvas.height = h*dpr;
+canvas.style.width = w+"px"
+canvas.style.height = h+"px"
+ctx.scale(dpr, dpr)
+
+let W = canvas.clientWidth;
+let H = canvas.clientHeight;
+
+class Vector {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+  add(v) {
+    return new Vector(this.x + v.x, this.y + v.y);
+  }
+  sub(v) {
+    return new Vector(this.x - v.x, this.y - v.y);
+  }
+  mult(k) {
+    return new Vector(this.x * k, this.y * k);
+  }
+  unit() {
+    return this.mult(1/this.mag());
+  }
+  mag() {
+    return Math.hypot(this.x, this.y);
+  }
+  rotate(angle) {
+    return new Vector(this.x * Math.cos(angle) - this.y * Math.sin(angle), this.x * Math.sin(angle) + this.y * Math.cos(angle));
+  }
+  lerp(v, k) {
+    return this.add(v.sub(this).mult(k));
+  }
+  set(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+  normal() {
+    return new Vector(- this.y, this.x);
+  }
+  static dot(a, b) {
+    return a.x * b.x + a.y * b.y;
+  }
+}
+
+let ID = 0;
+class Polygon {
+  constructor(isStatic, n, r, x = 0, y = 0, color = "#ffffff") {
+    this.static = isStatic;
+    this.id = ID++;
+    this.n = n;
+    this.r = r;
+    this.pos = new Vector(x, y);
+    this.color = color;
+    this.vertices = [];
+    this.axes = [];
+    this.angle = 0;
+    this.vel = new Vector(0, 0)
+    this.angVel = 0;
+    this.boundingBox = [];
+  }
+  
+  init() {
+    this.updateVertices();
+    this.updateAxes();
+  }
+  
+  computeBoundingBox() {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for(let i = 0; i < this.vertices.length; i++) {
+      const v = this.vertices[i];
+      minX = Math.min(v.x, minX);
+      minY = Math.min(v.y, minY);
+      maxX = Math.max(v.x, maxX);
+      maxY = Math.max(v.y, maxY);
+    }
+    this.boundingBox[0] = minX;
+    this.boundingBox[1] = maxX;
+    this.boundingBox[2] = minY;
+    this.boundingBox[3] = maxY;
+  }
+  
+  updateAxes() {
+    this.axes = [];
+    for(let idx = 0; idx < this.vertices.length; idx++) {
+      const current = this.vertices[idx];
+      const next = this.vertices[(idx + 1) % this.vertices.length]
+      this.axes.push(next.sub(current).unit().normal());
+    }
+  }
+  
+  updateVertices() {
+    this.vertices = [];
+    for(let i = 0; i < this.n; i++) {
+      let angle = i * 2 * Math.PI / this.n;
+      
+      
+      let v = new Vector(Math.cos(angle) * this.r, Math.sin(angle) * this.r);
+      v = v.rotate(- this.angle);
+      v = v.add(this.pos);
+      this.vertices.push(v);
+    }
+  }
+  
+  render(ctx) {
+    ctx.beginPath();
+    ctx.strokeStyle = this.color;
+    ctx.moveTo(this.pos.x, this.pos.y);
+    
+    for(const vertex of this.vertices) {
+      ctx.lineTo(vertex.x, vertex.y)
+    }
+    ctx.lineTo(this.vertices[0].x, this.vertices[0].y);
+    ctx.stroke()
+    ctx.closePath();
+  }
+  
+  setPosition(x = 0, y = 0) {
+    this.pos = this.pos.lerp(new Vector(x, y), 0.05);
+    this.vertices = [];
+    this.axes = [];
+    this.init();
+  }
+  
+  rotate(a) {
+    this.angle += a * Math.PI / 180;
+    this.updateVertices(a);
+    this.updateAxes();
+  }
+  
+  update(dt) {
+    this.vel = this.vel.mult(0.99)
+    this.pos = this.pos.add(this.vel)
+    this.updateVertices()
+    this.rotate(this.angVel);
+    this.computeBoundingBox();
+  }
+  
+}
+class Rectangle {
+  constructor(isStatic, w, h, x = 0, y = 0, color = "#ffffff") {
+    this.static = isStatic;
+    this.id = ID++;
+    this.w = w;
+    this.h = h;
+    this.pos = new Vector(x, y);
+    this.color = color;
+    this.vertices = [];
+    this.axes = [];
+    this.angle = 0;
+    this.vel = new Vector(0, 0);
+    this.static = isStatic;
+  }
+  
+  init() {
+    this.updateVertices();
+    this.updateAxes();
+  }
+  
+  updateAxes() {
+    this.axes = [];
+    for(let idx = 0; idx < this.vertices.length; idx++) {
+      const current = this.vertices[idx];
+      const next = this.vertices[(idx + 1) % this.vertices.length]
+      this.axes.push(next.sub(current).unit().normal());
+    }
+  }
+  
+  updateVertices() {
+    this.vertices = [];
+    this.vertices.push(
+      new Vector(- this.w, - this.h) .rotate(- this.angle).add(this.pos),
+      new Vector(this.w, - this.h).rotate(- this.angle).add(this.pos),
+      new Vector(this.w, this.h).rotate(- this.angle).add(this.pos),
+      new Vector(- this.w, this.h).rotate(- this.angle).add(this.pos)
+      
+    );
+
+  }
+  
+  render(ctx) {
+    ctx.beginPath();
+    ctx.strokeStyle = this.color;
+    ctx.moveTo(this.pos.x, this.pos.y);
+    
+    for(const vertex of this.vertices) {
+      ctx.lineTo(vertex.x, vertex.y)
+    }
+    ctx.lineTo(this.vertices[0].x, this.vertices[0].y);
+    ctx.stroke()
+    ctx.closePath();
+  }
+  
+  setPosition(x = 0, y = 0) {
+    this.pos = this.pos.lerp(new Vector(x, y), 0.05);
+    this.vertices = [];
+    this.axes = [];
+    this.init();
+  }
+  
+  rotate(a) {
+    this.angle += a * Math.PI / 180;
+    this.updateVertices(a);
+    this.updateAxes();
+  }
+  
+  update() {
+    //this.vel.y += 0.01;
+    this.vel = this.vel.mult(0.99)
+    this.pos = this.pos.add(this.vel)
+    this.updateVertices()
+  }
+  
+}
+
+class Circle {
+  constructor(isStatic, r, x, y, color = "rgb(255,255,255)") {
+    this.r = r;
+    this.static = isStatic;
+    this.pos = new Vector(x, y);
+    this.vel = new Vector();
+    this.color = color;
+    this.angVel = 0;
+    this.boundingBox = [];
+  }
+  getAxis(vertices) {
+    let closestVertex = vertices[0], closestVertexDist = this.pos.sub(closestVertex).mag();
+    for(const vertex of vertices) {
+      let dist = this.pos.sub(vertex).mag();
+      if(dist < closestVertexDist) {
+        closestVertexDist = dist;
+        closestVertex = vertex;
+      }
+    }
+    let axis = closestVertex.sub(this.pos).unit();
+    return [axis];
+  }
+  
+  render(ctx) {
+    ctx.beginPath();
+    ctx.strokeStyle = this.color;
+    ctx.moveTo(this.pos.x, this.pos.y)
+    ctx.arc(this.pos.x, this.pos.y, this.r, 0, 2*Math.PI);
+    ctx.stroke();
+  }
+  
+  computeBoundingBox() {
+    this.boundingBox[0] = this.pos.x - this.r;
+    this.boundingBox[1] = this.pos.x + this.r;
+    this.boundingBox[2] = this.pos.y - this.r;
+    this.boundingBox[3] = this.pos.y + this.r;
+  }
+  
+  rotate() {
+    
+  }
+  
+  update(dt) {
+    this.rotate(this.angVel * dt);
+    this.vel = this.vel.mult(0.99);
+    this.pos = this.pos.add(this.vel);
+    this.computeBoundingBox();
+  }
+  
+}
+
+function PolyVsPoly(p1, p2) {
+  const axes = p1.axes.concat(p2.axes);
+  let smallestOverlap = Infinity;
+  let smallestAxis = null;
+  for(const axis of axes) {
+    
+    let min1 = Vector.dot(p1.vertices[0], axis),
+    max1 = Vector.dot(p1.vertices[0], axis),
+    min2 = Vector.dot(p2.vertices[0], axis),
+    max2 = Vector.dot(p2.vertices[0], axis);
+    for(const v1 of p1.vertices) {
+      
+      let projection = Vector.dot(v1, axis);
+      if(projection < min1) {
+        min1 = projection;
+      } else if(projection > max1) {
+        max1 = projection;
+      }
+      
+    }
+    
+    for(const v2 of p2.vertices) {
+      
+      let projection = Vector.dot(v2, axis);
+      if(projection < min2) {
+        min2 = projection;
+      } else if(projection > max2) {
+        max2 = projection;
+      }
+      
+    }
+    
+    let overlap = Math.min(max1, max2) - Math.max(min1, min2);
+    if(overlap < smallestOverlap) {
+      smallestOverlap = overlap;
+      smallestAxis = axis;
+    }
+    if (overlap <= 0) {
+      return { colliding: false };
+    }
+    
+    
+  }
+  
+  const dir = p2.pos.sub(p1.pos);
+  if(Vector.dot(dir, smallestAxis) < 0) {
+    smallestAxis = smallestAxis.mult(-1);
+  }
+  
+  const mtv = smallestAxis.mult(smallestOverlap);
+  
+  return { colliding: true, mtv: mtv };
+  
+}
+
+function CircleVsPoly(cir, poly) {
+  const axes = poly.axes.concat(cir.getAxis(poly.vertices));
+  let smallestOverlap = Infinity;
+  let smallestAxis = null;
+  for(const axis of axes) {
+    
+    let min1 = Vector.dot(poly.vertices[0], axis),
+    max1 = Vector.dot(poly.vertices[0], axis),
+    min2 = null,
+    max2 = null;
+    for(const v1 of poly.vertices) {
+      
+      let projection = Vector.dot(v1, axis);
+      if(projection < min1) {
+        min1 = projection;
+      } else if(projection > max1) {
+        max1 = projection;
+      }
+      
+    }
+    
+    
+    let projection = Vector.dot(cir.pos, axis);
+    min2 = projection - cir.r;
+    max2 = projection + cir.r;
+    
+    
+    
+    let overlap = Math.min(max1, max2) - Math.max(min1, min2);
+    if(overlap < smallestOverlap) {
+      smallestOverlap = overlap;
+      smallestAxis = axis;
+    }
+    if (overlap <= 0) {
+      return { colliding: false };
+    }
+    
+    
+  }
+  /*
+  const dir = poly.pos.sub(cir.pos);
+  if(Vector.dot(dir, smallestAxis) < 0) {
+    smallestAxis = smallestAxis.mult(-1);
+  }
+  
+  const mtv = smallestAxis.mult(smallestOverlap).mult(-1);
+  */
+  return { colliding: true };
+}
+
+/*
+function generateRegularPolyVertices(n, r = 30) {
+  const vertices = [];
+  const t = Math.PI * 2 / n;
+  for(let i = 0; i < n; i++) {
+    vertices.push(new vec3(Math.cos(i * t) * r, Math.sin(i * t) * r));
+  }
+  return vertices;
+}*/
+function randint(min, max) {
+  return Math.floor((max + 1 - min) * Math.random()) + Math.floor(min);
+}
+
+let then = now = frame = dt = lastTime = fps = 0
+const entities = [];
+let satChecks = 0;
+for(let i = 0; i < 1000; i++) {
+  const x = randint(0, canvas.clientWidth);
+  const y = randint(50, canvas.clientHeight);
+  const angVel = randint(-1, 1);
+  let e;
+  if(Math.random() < 0.5) {
+    e = new Polygon(
+      false, randint(3, 7), randint(5, 20), x, y, "#09f");
+  } else {
+    e = new Circle(false, randint(5, 20), x, y, "#09f");
+  }
+  e.angVel = angVel;
+  entities.push(e);
+}
+
+let mouse = new Vector(entities[0].pos.x, entities[0].pos.y);
+
+function loop() {
+  requestAnimationFrame(loop)
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  
+  now = performance.now();
+  dt = (now - then) * 0.001;
+  then = now;
+  if(now - lastTime > 1000) {
+    fps = frame;
+    frame = 0;
+    lastTime = now;
+    document.querySelector("#fps").textContent = `FPS: ${fps} | SAT Checks: ${satChecks}`;
+  } else {
+    frame += 1
+  }
+  satChecks = 0;
+  
+  entities[0].pos.x += (mouse.x - entities[0].pos.x) * 0.05;
+  entities[0].pos.y += (mouse.y - entities[0].pos.y) * 0.05;
+  
+  /*p1.rotate(0.1);
+  p2.rotate(0.05);
+  t1.rotate(0.15);
+  t2.rotate(1);
+  w3.rotate(1);*/
+  
+  for(const e of entities) {
+    if(!e.static) e.update(dt);
+    e.color = "#09f";
+    grid.insert(e, e.boundingBox[0], e.boundingBox[2], e.boundingBox[1] - e.boundingBox[0], e.boundingBox[3] - e.boundingBox[2]);
+  }
+  
+  for(const e1 of entities) {
+    
+    const nearbyEntities = grid.query(e1.boundingBox[0], e1.boundingBox[2], e1.boundingBox[1] - e1.boundingBox[0], e1.boundingBox[3] - e1.boundingBox[2]);
+    
+    for(const e2 of nearbyEntities) {
+      
+      if(e1.id <= e2.id) continue;
+      let result = null;
+      if(e1 instanceof Circle && e2 instanceof Circle) {
+        continue;
+      } else if(e1 instanceof Circle) {
+        result = CircleVsPoly(e1, e2);
+      } else if(e2 instanceof Circle) {
+        result = CircleVsPoly(e2, e1);
+      } else {
+        result = PolyVsPoly(e1, e2);
+      }
+      
+      satChecks++;
+      
+      if(result.colliding) {
+        e1.color = "#fff";
+        e2.color = "#fff";
+      }
+      
+    }
+  }
+  
+  
+  
+  
+  
+  
+  for(const e of entities) {
+    //if(!e.static) e.update(dt);
+    e.render(ctx);
+  }
+  
+  
+  
+}
+
+/*
+const p1 = new Polygon(false, 5, 60, 170, 250, "rgb(126,156,238)");
+const p2 = new Polygon(false, 7, 80, 90, 100, "rgb(238,126,201)");
+t1 = new Polygon(false, 3, 90, 230, 150);
+t2 = new Polygon(false, 3, 30, 80, H - 150);
+w1 = new Rectangle(true, W, 1, 0, H + 2);
+w2 = new Rectangle(false, 20, 60, 280, 300);
+w3 = new Rectangle(true, 40, 10, 250, 250);
+c1 = new Circle(false, 30, 150, 350);
+*/
+
+//entities.push(p1, p2, t1, t2, w1, w2, w3, c1);
+
+
+for(const e of entities) {
+  if(e.init) e.init();
+}
+
+
+loop();
+
+
+window.addEventListener("pointerdown", e => {
+  mouse.set(e.clientX, e.clientY);
+})
+window.addEventListener("pointermove", e => {
+  mouse.set(e.clientX, e.clientY);
+})
+</script>
+</body>
+</html>

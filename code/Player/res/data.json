@@ -1,0 +1,36 @@
+{
+  
+  "japanese": [
+    
+    { "name": "Kaen", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785739/Kaen_qyywtx.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785890/Kaen_w7xxoh.lrc", "artist": "Queen Bee", "cover": "https://i1.sndcdn.com/artworks-000666401014-me5lyr-t500x500.jpg" },
+    { "name": "We'll be Alright", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785734/We_ll_be_Alright_xljpsq.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785895/We_ll_be_Alright_ajeshk.lrc", "artist": "RADWIMPS" },
+    { "name": "Yukitoki", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785733/Yukitoki_rzcmih.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785896/Yukitoki_y47cuz.txt", "artist": "Yanagi Nagi", "cover": "https://i.scdn.co/image/ab67616d0000b273a5637bff0e65e6d4f6223f24" },
+    { "name": "Shiwaawase", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785725/Shiwaawase_xppux7.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785893/Shiwaawase_qjhfev.lrc", "artist": "Vaundy", "cover": "https://images.genius.com/c654422e52644fba60530b649dddf51e.1000x1000x1.jpg" },
+    { "name": "Suki ni Shinayo", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785725/Suki_ni_shinayo_kzjdwe.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785894/Suki_ni_shinayo_an0cik.lrc", "artist": "Anly" },
+    { "name": "Seikai", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785725/Seikai_g9u5fp.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785892/Seikai_v3u1g3.lrc", "artist": "RADWIMPS" },
+    { "name": "Wasuregataki", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785723/Wasuregataki_ngf4df.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785895/Wasuregataki_jvbjy8.txt", "artist": "Huwie Ishizaki" },
+    { "name": "Takaramono ni Natta Hi", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785722/Takaramono_Ni_Natta_Hi_xeotwb.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785894/Takaramono_Ni_Natta_Hi_yi4xgs.lrc", "artist": "Yanagi Nagi" },
+    { "name": "Spiral", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785719/Spiral_fqen0l.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785893/Spiral_j3asii.lrc", "artist": "Longman" },
+    { "name": "Sparkle", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785716/Sparkle_rgu50g.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785893/Sparkle_detmbf.lrc", "artist": "RADWIMPS" },
+    { "name": "Itsuka", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785707/Itsuka_zgp5ez.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785889/Itsuka_yvqgix.lrc", "artist": "Arekun" },
+    { "name": "Nandemonaiya", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785707/Nandemonaiya_oqkxi7.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785891/Nandemonaiya_twng1s.lrc", "artist": "RADWIMPS" },
+    { "name": "Sangenshoku", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785705/Sangenshoku_ddaxdc.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786787172/Sangenshoku_xlvd88.txt", "artist": "Pelican Fanclub" },
+    { "name": "Ningen Gokko", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785701/Ningen_Gokko_rgqicz.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785892/Ningen_Gokko_lxkvrc.lrc", "artist": "RADWIMPS" },
+    { "name": "Name", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785700/Name_krfmh4.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785891/Name_stomhd.lrc", "artist": "Tsuzuri" },
+    { "name": "Kimi no Moji", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785694/Kimi_no_Moji_mwoxnn.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785891/Kimi_no_Moji_ljzk9l.lrc", "artist": "Anri Kumaki" },
+    { "name": "Hitohira", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785691/Hitohira_wdklb0.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785889/Hitohira_cvqqhn.lrc", "artist": "sweet ARMS" },
+    { "name": "Grand Escape", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785687/Grand_Escape_cdqhvw.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785888/Grand_Escape_cpfcfz.lrc", "artist": "RADWIMPS" },
+    { "name": "Kaijuu", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785686/Kaijuu_ixtzat.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785890/Kaijuu_gzuue3.lrc", "artist": "Sakanaction" },
+    { "name": "Haruka", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785686/Haruka_rzb9zb.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785889/Haruka_poxyla.lrc", "artist": "Ryujin Kiyoshi" },
+    { "name": "Aoi Shiori", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785560/Aoi_Shiori_hgp1x6.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785828/Aoi_Shiori_nssyx7.txt", "artist": "Galileo Galilei" },
+    { "name": "Good Morning World!", "url": "https://res.cloudinary.com/dascnmetz/video/upload/v1786785679/Good_Morning_World_xj6sjb.mp3", "lrc": "https://res.cloudinary.com/dascnmetz/raw/upload/v1786785888/Good_Morning_World_ahozn5.txt", "artist": "Burnout Syndromes", "cover": "https://i.scdn.co/image/ab67616d0000b27362d63c5a02f9c507d2a649a2" }
+  
+    
+    
+  ],
+  
+  "english": [
+
+  ]
+  
+}

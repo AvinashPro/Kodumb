@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: rgb(2,15,15);
+      padding-bottom: 40px;
+    }
+    div {
+      color: rgb(198,255,255);
+      margin-left: 20px;
+      margin-top: 30px;
+      font-size: 18px;
+    }
+    a {
+      color: rgb(153,255,255);
+      margin-left: 30px;
+      font-size: 12px;
+      border-bottom: 0.5px solid rgb(35,154,154);
+      text-decoration: none;
+      outline: none;
+    }
+    a.repo {
+      color: rgb(186,240,240);
+      border: none;
+    }
+    input {
+      display: inline-block;
+      margin: 20px;
+      margin-right: 10px;
+      background: none;
+      border: 1px dashed rgba(200,200,255,0.4);
+      padding: 10px;
+      border-radius: 10px;
+      outline: none;
+      color: rgb(194,251,251);
+      will-change: transform;
+      transition: 0.2s;
+    }
+    button {
+      display: inline-block;
+      background: rgb(95,200,200);
+      color: rgb(17,61,61);
+      user-select: none;
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      will-change: transform;
+      transition: 0.2s;
+    }
+    input:focus {
+      transform: scale(1.1) translateY(5px);
+    }
+    button:hover {
+      background: rgb(43,119,119);
+      transform: scale(1.1) translateY(10px);
+    }
+  </style>
+</head>
+<body>
+  <input type="text" id="search" placeholder="Enter github username here...">
+  <button id="sub">Proceed</button>
+  <div id="page">
+    Nothing to see here!
+  </div>
+<script>
+  
+  
+  async function main(user) {
+    let k = 0;
+    const res = await fetch(`https://api.github.com/users/${user}/repos`);
+    const data = await res.json();
+    let html = "";
+    data.forEach(repo => {
+      
+      html += `<div>${++k}. ${repo.name}</div>`;
+      if(repo.has_pages) {
+        html += `<a href="https://${user}.github.io/${repo.name}">Page</a>`
+      } else {
+        html += `<a href="${repo.html_url}" class="repo">Repo</a>`;
+      }
+      console.log(repo, repo.homepage)
+    })
+    document.querySelector("#page").innerHTML = html;
+  }
+  
+  //main();
+  
+  
+  const i = document.querySelector("input");
+  document.querySelector("button").addEventListener("click", () => {
+    main(i.value);
+    i.value = "";
+  })
+  
+  
+  
+</script>
+</body>
+</html>
