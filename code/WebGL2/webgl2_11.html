@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>WebGL2</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      max-height: 100vh;
+      height: 100vh;
+      overflow-y: hidden;
+      display: grid;
+      place-items: center;
+      background: rgb(10,20,30);
+    }
+    #info-elm {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #fff;
+      mix-blend-mode: difference;
+    }
+  </style>
+</head>
+<body>
+  <canvas></canvas>
+  <p id="info-elm"></p>
+<script>
+  class Assets {
+  
+  constructor() {
+    this.assets = new Map();
+  }
+
+  async load(data = []) {
+    await Promise.all(data.map(async (params) => {
+      const type = params.type;
+      let asset;
+      
+      switch(type) {
+        case "img": {
+          asset = new Image();
+          if(params.crossOrigin !== undefined) asset.crossOrigin = params.crossOrigin;
+          asset.src = params.url;
+          await asset.decode();
+          break;
+        }
+        case "audio": {
+          asset = new Audio();
+          asset.src = params.url;
+          await new Promise((resolve, reject) => {
+            asset.oncanplaythrough = resolve;
+            asset.onerror = () => reject(new Error(`Failed to load audio: ${params.key}`));
+          });
+          break;
+        }
+        case "json": {
+          const res = await fetch(params.url);
+          if (!res.ok) throw new Error(`Failed to fetch JSON: ${params.key}`);
+          asset = await res.json();
+          break;
+        }
+      }
+
+      this.assets.set(params.key, asset);
+    }));
+
+    
+    return this.assets;
+  }
+
+  get(key) {
+    return this.assets.get(key);
+  }
+  
+}
+  class Mat4 {
+  
+  static IDENTITY = new Float32Array([
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]);
+  
+  constructor(data = new Float32Array(16)) {
+    this.data = data;
+  }
+  
+  static identity(m = new Mat4()) {
+    m.data.set(Mat4.IDENTITY);
+    return m;
+  }
+  
+  static scaling(sx, sy, sz = 1, m = new Mat4()) {
+    const d = m.data;
+    d[0] = sx; d[1] = 0; d[2] = 0; d[3] = 0;
+    d[4] = 0; d[5] = sy; d[6] = 0; d[7] = 0;
+    d[8] = 0; d[9] = 0; d[10] = sz; d[11] = 0;
+    d[12] = 0; d[13] = 0; d[14] = 0; d[15] = 1;
+    return m;
+  }
+  
+  static translation(tx, ty, tz = 0, m = new Mat4()) {
+    const d = m.data;
+    d[0] = 1; d[1] = 0; d[2] = 0; d[3] = 0;
+    d[4] = 0; d[5] = 1; d[6] = 0; d[7] = 0;
+    d[8] = 0; d[9] = 0; d[10] = 1; d[11] = 0;
+    d[12] = tx; d[13] = ty; d[14] = tz; d[15] = 1;
+    return m;
+  }
+  
+  static rotationZ(angle, m = new Mat4()) {
+    const d = m.data;
+    const s = Math.sin(angle);
+    const c = Math.cos(angle);
+    d[0] = c; d[1] = s; d[2] = 0; d[3] = 0;
+    d[4] = -s; d[5] = c; d[6] = 0; d[7] = 0;
+    d[8] = 0; d[9] = 0; d[10] = 1; d[11] = 0;
+    d[12] = 0; d[13] = 0; d[14] = 0; d[15] = 1;
+    return m;
+  }
+  
+
+  translate(tx, ty, tz = 0) {
+    const d = this.data;
+    for(let row = 0; row < 4; row++) {
+      const i = row * 4;
+      const w = d[i + 3];
+      d[i + 0] += tx * w;
+      d[i + 1] += ty * w;
+      d[i + 2] += tz * w;
+    }
+    return this;
+  }
+  
+  scale(sx, sy, sz = 1) {
+    const d = this.data;
+    for(let row = 0; row < 4; row++) {
+      const i = row * 4;
+      d[i + 0] *= sx;
+      d[i + 1] *= sy;
+      d[i + 2] *= sz;
+    }
+    return this;
+  }
+  
+  rotateZ(angle) {
+    const d = this.data;
+    const d0 = d[0], d4 = d[4], d8 = d[8], d12 = d[12];
+    const sin = Math.sin(angle);
+    const cos = Math.cos(angle);
+    d[0] = cos * d0 - sin * d[1];
+    d[4] = cos * d4 - sin * d[5];
+    d[8] = cos * d8 - sin * d[9];
+    d[12] = cos * d12 - sin * d[13];
+    d[1] = sin * d0 + cos * d[1];
+    d[5] = sin * d4 + cos * d[5];
+    d[9] = sin * d8 + cos * d[9];
+    d[13] = sin * d12 + cos * d[13];
+    return this;
+  }
+  
+  static multiply(a, b, m = new Mat4()) {
+    const m1 = a.data;
+    const m2 = b.data;
+    const aliased = (m.data === m1 || m.data === m2);
+    const r = (aliased ? new Float32Array(16) : m.data);
+    
+    for(let row = 0; row < 4; row++) {
+      const i = row * 4;
+      const b0 = m2[i], b1 = m2[i+1], b2 = m2[i+2], b3 = m2[i+3];
+      r[i] = m1[0] * b0 + m1[4] * b1 + m1[8] * b2 + m1[12] * b3;
+      r[i+1] = m1[1] * b0 + m1[5] * b1 + m1[9] * b2 + m1[13] * b3;
+      r[i+2] = m1[2] * b0 + m1[6] * b1 + m1[10] * b2 + m1[14] * b3;
+      r[i+3] = m1[3] * b0 + m1[7] * b1 + m1[11] * b2 + m1[15] * b3;
+    }
+    if(aliased) m.data.set(r);
+    return m;
+  }
+  
+  static orthographic(l, r, t, b, n, f, m = Mat4.identity()) {
+    const d = m.data;
+    d[0] = 2 / (r - l); d[1] = 0; d[2] = 0; d[3] = 0;
+    d[4] = 0; d[5] = 2 / (t - b); d[6] = 0; d[7] = 0;
+    d[8] = 0; d[9] = 0; d[10] = -2 / (f - n); d[11] = 0;
+    d[12] = - (r + l) / (r - l);
+    d[13] = - (t + b) / (t - b);
+    d[14] = -(f + n) / (f - n);
+    d[15] = 1;
+    return m;
+  }
+  
+  print() {
+    const d = this.data;
+    return`\n${d[0]}  ${d[4]}  ${d[8]}  ${d[12]}\n${d[1]}  ${d[5]}  ${d[9]}  ${d[13]}\n${d[2]}  ${d[6]}  ${d[10]}  ${d[14]}\n${d[3]}  ${d[7]}  ${d[11]}  ${d[15]}\n`;
+  }
+  
+}
+
+  const canvas = document.querySelector("canvas");
+  const gl = canvas.getContext("webgl2");
+  
+  const camera = { x: 0, y: 0 };
+  const projectionMatrix = new Mat4();
+  const viewMatrix = new Mat4();
+  
+  function resizeCanvas(w = window.innerWidth, h = window.innerHeight) {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    Mat4.orthographic(0, canvas.width, 0, canvas.height, -1000, 1000, projectionMatrix);
+    Mat4.translation(canvas.width / 2 - camera.x, canvas.height / 2 - camera.y, 0, viewMatrix);
+  }
+  window.onresize = () => { resizeCanvas(); }
+  resizeCanvas();
+  
+  
+  
+  function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    
+    if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const info = gl.getShaderInfoLog(shader);
+      gl.deleteShader(shader);
+      throw new Error(info);
+    }
+    
+    return shader;
+  }
+  
+  function createProgram(gl, vs, fs) {
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    
+    if(!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const info = gl.getProgramInfoLog(program);
+      gl.deleteProgram(program);
+      throw new Error(info);
+    }
+    
+    return program;
+  }
+  
+  function createTexture(gl, img, flip = false) {
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    if(flip) gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    return texture;
+  }
+  
+  class Mesh {
+    constructor(vao, indexCount) {
+      this.vao = vao;
+      this.indexCount = indexCount;
+    }
+  }
+  
+  class Material {
+    constructor(texture, img) {
+      this.texture = texture;
+      this.img = img;
+    }
+  }
+  
+  class Object2D {
+    constructor(mesh, params = {}) {
+      this.mesh = mesh;
+      this.material = params.material;
+      this.modelMatrix = Mat4.identity();
+      
+      this.pos = { x: params.x ?? 0, y: params.y ?? 0, z: params.z ?? 0 };
+      this.vel = { x: params.velX ?? 0, y: params.velY ?? 0 };
+      this.angle = params.angle ?? 0;
+      this.angVel = params.angVel ?? 0;
+      this.scaleX = params.scaleX ?? 1;
+      this.scaleY = params.scaleY ?? 1;
+      this.sprite = params.sprite;
+    }
+    
+    getModelMatrix() {
+      Mat4.identity(this.modelMatrix).scale(this.scaleX, this.scaleY)
+                      .rotateZ(this.angle)
+                      .translate(this.pos.x, this.pos.y, this.pos.z);
+      return this.modelMatrix;
+    }
+    
+    update(dt) {
+      this.pos.x += this.vel.x * dt;
+      this.pos.y += this.vel.y * dt;
+      this.angle += this.angVel * dt;
+    }
+    
+  }
+  
+  class Renderer {
+    constructor(gl, program, objects) {
+      this.gl = gl;
+      this.program = program;
+      this.objects = objects;
+      this.init();
+    }
+    
+    init() {
+      this.modelLocation = this.gl.getUniformLocation(this.program, "u_model");
+      this.viewLocation = this.gl.getUniformLocation(this.program, "u_view");
+      this.projLocation = this.gl.getUniformLocation(this.program, "u_proj");
+      this.uvOffsetLocation = this.gl.getUniformLocation(this.program, "u_uvOffset");
+      this.uvScaleLocation = this.gl.getUniformLocation(this.program, "u_uvScale");
+      //this.zLocation = this.gl.getAttribLocation(this.program, "a_z");
+    }
+    
+    clear(r, g, b, a) {
+      this.gl.clearColor(r, g, b, a);
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    }
+    
+    render(view, proj) {
+      const { gl, program } = this;
+      gl.useProgram(program);
+      gl.uniformMatrix4fv(this.viewLocation, false, view.data);
+      gl.uniformMatrix4fv(this.projLocation, false, proj.data);
+      
+      for(const e of this.objects) {
+        const model = e.getModelMatrix();
+        gl.uniformMatrix4fv(this.modelLocation, false, model.data);
+        
+        if(e.material) {
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, e.material.texture);
+        }
+        
+        //gl.vertexAttrib1f(this.zLocation, e.zIdx);
+        
+        if(e.sprite) {
+          gl.uniform2f(this.uvOffsetLocation, e.sprite.x, e.sprite.y);
+          gl.uniform2f(this.uvScaleLocation, e.sprite.w, e.sprite.h);
+        } else {
+          gl.uniform2f(this.uvOffsetLocation, 0, 0);
+          gl.uniform2f(this.uvScaleLocation, 1, 1);
+        }
+        
+        gl.bindVertexArray(e.mesh.vao);
+        gl.drawElements(gl.TRIANGLES, e.mesh.indexCount, gl.UNSIGNED_SHORT, 0);
+      }
+      
+    }
+    
+  }
+  
+  class Sprite {
+    constructor(x, y, w, h, ssw, ssh) {
+      this.inv_ssw = 1 / ssw; // spritesheet width 
+      this.inv_ssh = 1 / ssh; // spritesheet height
+      this._x = x * this.inv_ssw;
+      this._y = (ssh - h - y) * this.inv_ssh;
+      this.w = w * this.inv_ssw;
+      this.h = h * this.inv_ssh;
+    }
+    
+    set x(v) { this._x = v * this.inv_ssw; }
+    set y(v) { this._y = v * this.inv_ssh; }
+    get x() { return this._x; }
+    get y() { return this._y; }
+    
+  }
+  
+  class Spritesheet {
+    constructor(ssw, ssh, columns, rows) {
+      this.ssw = ssw;
+      this.ssh = ssh;
+      this.columns = columns;
+      this.rows = rows;
+      this.sw = ssw / columns;
+      this.sh = ssh / rows;
+      
+      this.inv_ssw = 1 / ssw;
+      this.inv_ssh = 1 / ssh;
+      this.inv_columns = 1 / this.columns;
+      this.inv_rows = 1 / this.rows;
+    }
+    
+    getSprite(val, sprite = new Sprite()) {
+      const nW = this.sw * this.inv_ssw;
+      const nH = this.sh * this.inv_ssh;
+      const u = (val - 1) % this.columns * this.inv_columns;
+      const v = (this.rows - 1 - Math.floor((val - 1) / this.columns)) * this.inv_rows;
+      
+      sprite._x = u;
+      sprite._y = v;
+      sprite.inv_ssw = 1 * this.inv_ssw;
+      sprite.inv_ssh = 1 * this.inv_ssh;
+      sprite.w = nW;
+      sprite.h = nH;
+      return sprite;
+    }
+    
+  }
+  
+  class Animation {
+    constructor(name, spritesheet, frames, frameDuration, currentFrameIdx = 0) {
+      this.name = name;
+      this.frames = frames;
+      this.frameDur = frameDuration;
+      if(frameDuration > 1) {
+        console.warn("Ensure that the frame duration provided are in seconds");
+      }
+      this.framesCount = frames.length;
+      this.time = 0;
+      this.currentFrameIdx = currentFrameIdx;
+      this.spritesheet = spritesheet;
+    }
+    
+    update(dt) {
+      this.time += dt;
+      while(this.time >= this.frameDur) {
+        this.currentFrameIdx++;
+        this.time -= this.frameDur;
+      }
+      this.currentFrameIdx %= this.framesCount;
+    }
+    
+    updateFrame(sprite) {
+      this.spritesheet.getSprite(this.frames[this.currentFrameIdx], sprite);
+    }
+    
+  }
+  
+  
+  const res = new Assets();
+  async function loadRes(data) {
+    await res.load(data);
+  }
+  loadRes([
+    { key: 0, url: "res/Grotto.png", type: "img", crossOrigin: "anonymous" }, // Grotto spritesheet (64 x 32)
+    { key: "aira", url: "res/Aira.jpg", type: "img", crossOrigin: "anonymous" } // Aira - smiling (as in end of OP) (1280 x 720)
+  ]).then(() => {
+    main();
+  });
+  
+
+  const vs_source =
+`#version 300 es
+
+in vec2 a_position;
+in vec2 a_uv;
+out vec2 v_uv;
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_proj;
+
+void main() {
+  gl_Position = u_proj * u_view * u_model * vec4(a_position, 0, 1);
+  v_uv = a_uv;
+}
+`;
+
+  const fs_source =
+`#version 300 es
+precision mediump float;
+
+in vec2 v_uv;
+out vec4 f_color;
+uniform sampler2D u_texture;
+uniform vec2 u_uvOffset;
+uniform vec2 u_uvScale;
+
+void main() {
+  vec2 muv = u_uvOffset + u_uvScale * v_uv;
+
+  vec4 tex = texture(u_texture, muv);
+  if(tex.a == 0.0) discard;
+  f_color = tex;
+}
+`;
+
+  const vs = createShader(gl, gl.VERTEX_SHADER, vs_source);
+  const fs = createShader(gl, gl.FRAGMENT_SHADER, fs_source);
+  const program = createProgram(gl, vs, fs);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.enable(gl.DEPTH_TEST);
+  gl.useProgram(program);
+  
+  const vertices = new Float32Array([
+    -50, 50, 0, 0,
+    50, 50, 1, 0,
+    50, -50, 1, 1,
+    -50, -50, 0, 1
+  ]);
+  const indices = new Uint16Array([
+    0, 1, 2,
+    0, 2, 3
+  ]);
+  
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const indexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+  const posLocation = gl.getAttribLocation(program, "a_position");
+  const uvLocation = gl.getAttribLocation(program, "a_uv");
+  //const zLocation = gl.getAttribLocation(program, "a_z");
+  gl.enableVertexAttribArray(posLocation);
+  gl.enableVertexAttribArray(uvLocation);
+  //gl.disableVertexAttribArray(zLocation);
+  gl.vertexAttribPointer(posLocation, 2, gl.FLOAT, false, 16, 0);
+  gl.vertexAttribPointer(uvLocation, 2, gl.FLOAT, false, 16, 8);
+  //gl.vertexAttrib1f(zLocation, 1);
+  gl.bindVertexArray(null);
+  
+  /*const uvOffset = new Float32Array([0.5, 0]);
+  const uvScale = new Float32Array([0.5, 0.5]);*/
+  /*const uvOffsetLocation = gl.getUniformLocation(program, "u_uvOffset");
+  const uvScaleLocation = gl.getUniformLocation(program, "u_uvScale");
+  gl.uniform2f(uvOffsetLocation, 0, 0);
+  gl.uniform2f(uvScaleLocation, 1, 1);
+  */
+  
+  const objects = [];
+  
+  const mesh1 = new Mesh(vao, indices.length);
+  const renderer = new Renderer(gl, program, objects);
+  
+  
+
+  
+  let dt, fps = 0, t0 = performance.now(), lastSec = t0, frames = 0;
+  const infoElm = document.querySelector("#info-elm");
+  let walkAnim;
+  function main() {
+    const img1 = res.get(0);
+    const img2 = res.get("aira");
+    const material1 = new Material(createTexture(gl, img1, true), img1);
+    const material2 = new Material(createTexture(gl, img2, true), img2);
+    const spritesheet1 = new Spritesheet(img1.width, img1.height, 4, 2);
+    walkAnim = new Animation("walk", spritesheet1, [1,2,3,2], 0.25);
+    
+    
+    const obj1 = new Object2D(mesh1, {
+      x: 0, y: -400, z: 10, angVel: 0,
+      scaleX: 1, scaleY: 1,
+      material: material1,
+      sprite: spritesheet1.getSprite(6)
+    });
+    const obj2 = new Object2D(mesh1, {
+      x: 0, y: 400, angVel: 0.1,
+      scaleX: 8, scaleY: img2.height / img2.width * 8,
+      material: material2
+    });
+    
+    
+    
+    
+    objects.push(obj2, obj1);
+    requestAnimationFrame(loop);
+  }
+  
+  function calc_dt(t) {
+    dt = (t - t0) * 0.001;
+    t0 = t;
+    frames++;
+    if(t - lastSec >= 1000) {
+      fps = frames;
+      frames = 0;
+      lastSec += 1000;
+      infoElm.textContent = fps;
+    }
+  }
+  
+  function loop(t) {
+    requestAnimationFrame(loop);
+    calc_dt(t);
+    
+    for(const e of objects) {
+      if(e.scaleX < 10) {
+        e.scaleX += 0.01;
+        e.scaleY += 0.01;
+      } else {
+        e.vel.y = - Math.random() * 50 + 20;
+      }
+      e.update(dt);
+    }
+    
+    walkAnim.update(dt);
+    walkAnim.updateFrame(objects[1].sprite);
+    
+    renderer.clear(0, 0.05, 0.1, 1);
+    renderer.render(viewMatrix, projectionMatrix);
+    
+  }
+  
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap');
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Roboto Condensed", "Sans-Serif";
+}
+body {
+  background: rgb(5,15,20);
+  min-height: 100vh;
+}
+.code-name {
+  font-size: 24px;
+  color: rgb(176,233,255,0.9);
+  font-weight: 700;
+}
+#code-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  padding: 20px;
+}
+#code-section a{
+  text-decoration: none;
+  outline: none;
+  color: #c5faff;
+  opacity: 0.7;
+  transition: ease 0.25s;
+  margin-right: 5px;
+  display: inline-block;
+}
+#code-section > div {
+  flex: 1 1 300px;       
+  max-width: 400px;
+  /*display: flex;
+  flex-direction: column;*/
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  padding: 20px;
+}
+nav img {
+  width: 48px;
+  height: 48px;
+}
+nav {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 20px;
+}
+nav p {
+  font-size: 24px;
+  font-weight: 700;
+  color: #98e2ff;
+}
+#code-section a:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+#input-section {
+  width: 80%;
+  margin: auto;
+}
+input {
+  width: 90%;
+  max-width: 300px;
+  background: rgb(2,18,28);
+  border: 2px solid rgb(9,26,36);
+  color: rgb(73,180,242);
+  outline: none;
+  padding: 5px;
+  padding-left: 10px;
+  border-radius: 5px;
+  height: 40px;
+  margin-top: 20px;
+}
+input::placeholder {
+  color: rgba(73,180,242,0.8);
+}

@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Lalatina</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      display: grid;
+      place-items: center;
+      background: rgb(0,10,20);
+    }
+    #infoElm {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      mix-blend-mode: difference;
+      opacity: 0.7;
+      font-family: Sans-Serif;
+    }
+    canvas {
+      width: 100vw;
+      height: 100vh;
+      border: 1px solid rgba(20,31,64,0.4);
+      box-shadow: 0 0 20px rgba(20,31,64,0.3);
+      touch-action: none;
+    }
+    #controller {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      touch-action: none;
+      pointer-events: none;
+    }
+    
+    #joystick-elm {
+      position: absolute;
+      bottom: calc(50px - 100px);
+      left: calc(80px - 100px);
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      touch-action: none;
+    }
+    .joystick-rA {
+      position: absolute;
+      border-radius: 50%;
+      /*border: 1px solid #09f;*/
+    }
+    .joystick-rF {
+      position: absolute;
+      background: rgba(255,255,255,0.05);
+      border-radius: 50%;
+      transition: 0.1s ease-out;
+      pointer-events: none;
+    }
+    .joystick-rB {
+      position: relative;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+      pointer-events: none;
+    }
+    .joystick-rF,
+    .joystick-rB {
+      backdrop-filter: blur(5px);
+    }
+    .controller-button {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      color: rgba(130,181,255,0.2);
+      background: radial-gradient(circle at center center, rgba(255,255,255,0.0), rgba(255,255,255,0.05));
+      border: 1px solid rgba(130,181,255,0.1);
+      user-select: none;
+      font-family: Sans-Serif;
+    }
+    .controller-button.active {
+      background: radial-gradient(circle at center center, rgba(255,255,255,0), rgba(255,255,255,0.1));
+    }
+    #x-btn {
+      width: 60px;
+      height: 60px;
+      bottom: 30px;
+      right: 20px;
+    }
+    #a-btn {
+      bottom: 80px;
+      right: 70px;
+    }
+    #r-btn {
+      bottom: 20px;
+      right: 85px;
+    }
+    #y-btn {
+      bottom: 110px;
+      right: 20px;
+    }
+    
+    #joystick-elm,
+    .controller-button {
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="controller">
+    <div id="joystick-elm">
+      <div class="joystick-rA"></div>
+      <div class="joystick-rB"></div>
+      <div class="joystick-rF"></div>
+    </div>
+    <div class="controller-button" id="x-btn">X</div>
+    <div class="controller-button" id="a-btn">A</div>
+    <div class="controller-button" id="r-btn">R</div>
+    <div class="controller-button" id="y-btn">Y</div>
+  </div>
+  <canvas></canvas>
+  <p id="infoElm"></p>
+
+<script>
+class Joystick {
+  constructor(elm, rF, rB, rA = null) {
+    this.elm = elm;
+    this._x = 0;
+    this._y = 0;
+    this.rF = rF;
+    this.rB = rB;
+    this.rBInv = 1 / rB;
+    this.rA = rA ?? rB;
+    this._positionX = 0;
+    this._positionY = 0;
+    this._rA_Rect = null;
+    this.init();
+  }
+  init() {
+    const rF_elm = this.elm.querySelector(".joystick-rF");
+    const rB_elm = this.elm.querySelector(".joystick-rB");
+    const rA_elm = this.elm.querySelector(".joystick-rA");
+    
+    rF_elm.style.width = `${2*this.rF}px`;
+    rF_elm.style.height = `${2*this.rF}px`;
+    rB_elm.style.width = `${2*this.rB}px`;
+    rB_elm.style.height = `${2*this.rB}px`;
+    rA_elm.style.width = `${2*this.rA}px`;
+    rA_elm.style.height = `${2*this.rA}px`;
+    this.elm.style.width = `${2*this.rA}px`;
+    this.elm.style.height = `${2*this.rA}px`;
+    
+    this._rA_Rect = rA_elm.getBoundingClientRect();
+    window.addEventListener("resize", () => {
+      this._rA_Rect = rA_elm.getBoundingClientRect();
+    })
+    
+    rA_elm.addEventListener("pointerdown", e => {
+      let dx = (e.clientX - this._rA_Rect.left) - this.rA;
+      let dy = (e.clientY - this._rA_Rect.top) - this.rA;
+      this.active = true;
+      const distSq = dx * dx + dy * dy;
+      if(distSq > this.rB * this.rB) {
+        const r = this.rB / Math.sqrt(distSq);
+        dx *= r;
+        dy *= r;
+      }
+      rF_elm.style.transform = `translate(${dx}px, ${dy}px)`;
+      this._positionX = dx;
+      this._positionY = dy;
+    })
+    rA_elm.addEventListener("pointermove", e => {
+      let dx = (e.clientX - this._rA_Rect.left) - this.rA;
+      let dy = (e.clientY - this._rA_Rect.top) - this.rA;
+      this.active = true;
+      const distSq = dx * dx + dy * dy;
+      if(distSq > this.rA * this.rA) {
+        this.active = false;
+        rF_elm.style.transform = "translate(0, 0)";
+        this._positionX = 0;
+        this._positionY = 0;
+        return;
+      }
+      if(distSq > this.rB * this.rB) {
+        const r = this.rB / Math.sqrt(distSq);
+        dx *= r;
+        dy *= r;
+      }
+      rF_elm.style.transform = `translate(${dx}px, ${dy}px)`;
+      this._positionX = dx;
+      this._positionY = dy;
+    })
+    
+    rA_elm.addEventListener("pointerup", () => {
+      this.active = false;
+      rF_elm.style.transform = "translate(0, 0)";
+      this._positionX = 0;
+      this._positionY = 0;
+    })
+  }
+  
+  get x() {
+    this._x = this._positionX * this.rBInv;
+    return this._x;
+  }
+  
+  get y() {
+    this._y = this._positionY * this.rBInv;
+    return this._y;
+  }
+  
+}
+class Assets {
+
+  constructor() {
+    this.assets = new Map();
+  }
+
+  async load(...data) {
+    await Promise.all(data.map(async (params) => {
+      const type = params.type;
+      let asset;
+
+      switch (type.toLowerCase()) {
+        case "img": {
+          asset = new Image();
+          asset.src = params.url;
+          await asset.decode();
+          break;
+        }
+        case "audio": {
+            asset = new Audio();
+            asset.src = params.url;
+            await new Promise((resolve, reject) => {
+              asset.oncanplaythrough = resolve;
+              asset.onerror = () => reject(new Error(`Failed to load audio: ${params.key}`));
+            });
+            break;
+          }
+        case "json": {
+            const res = await fetch(params.url);
+            if (!res.ok) throw new Error(`Failed to fetch JSON: ${params.key}`);
+            asset = await res.json();
+            break;
+          }
+        case "text": {
+            const res = await fetch(params.url);
+            if (!res.ok) throw new Error(`Failed to fetch TEXT: ${params.key}`);
+            asset = await res.text();
+            break;
+          }
+      }
+
+      this.assets.set(params.key, asset);
+    }));
+
+
+    return this.assets;
+  }
+
+  get(key) {
+    return this.assets.get(key);
+  }
+
+}
+class vec2 {
+  static count = 0;
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+    vec2.count++;
+  }
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+  }
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+  }
+  scale(k) {
+    this.x *= k;
+    this.y *= k;
+    return this;
+  }
+  addScaled(v, t) {
+    this.x += v.x * t;
+    this.y += v.y * t;
+    return this;
+  }
+  clone() {
+    return new vec2(this.x, this.y);
+  }
+  static from(v) {
+    return new vec2(v.x, v.y);
+  }
+  copy(v) {
+    this.x = v.x;
+    this.y = v.y;
+    return this;
+  }
+  set(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+  dot(v) {
+    return this.x * v.x + this.y * v.y;
+  }
+  cross(v) {
+    return this.x * v.y - v.x * this.y;
+  }
+  rotate(angle, v = this) {
+    const sin = Math.sin(angle);
+    const cos = Math.cos(angle);
+    const { x, y } = this;
+    v.x = x * cos - y * sin;
+    v.y = x * sin + y * cos;
+    return v;
+  }
+  rotate2(sin, cos, v = this) {
+    const { x, y } = this;
+    v.x = x * cos - y * sin;
+    v.y = x * sin + y * cos;
+    return v;
+  }
+  lengthSq() {
+    return this.x * this.x + this.y * this.y;
+  }
+  length() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  }
+  normalize() {
+    const len = this.length();
+    if(len !== 0) return this.scale(1 / len);
+    return this.set(1, 0);
+  }
+  lerp(v, t = 0.05) {
+    this.x += (v.x - this.x) * t;
+    this.y += (v.y - this.y) * t;
+    return this;
+  }
+}
+class Body {
+  static _id = 0;
+  constructor(params = {}) {
+    this.pos = new vec2(params.x ?? 0, params.y ?? 0);
+    this.vel = new vec2(params.velX ?? 0, params.velY ?? 0);
+    this.angle = params.angle ?? 0;
+    this.angVel = params.angVel ?? 0;
+    this.color = params.color || "#09f";
+    this.aabb = [];
+    this.fill = params.fill;
+    this.speed = 0;
+  }
+  computeWorldVertices() { }
+  computeAABB() { }
+  render() { }
+  update(dt) {
+    this.angle += this.angVel * dt;
+    this.vel.scale(0.99);
+    this.pos.addScaled(this.vel, dt);
+    this.sinCache = Math.sin(this.angle);
+    this.cosCache = Math.cos(this.angle);
+    this.computeWorldVertices();
+    this.computeAABB();
+  }
+  renderAABB(ctx, z) {
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.fillRect(0, 0, this.aabb[1] - this.aabb[0], this.aabb[3] - this.aabb[2]);
+  }
+}
+class Polygon extends Body {
+  
+  constructor(params = {}) {
+    super(params);
+    this.id = Body._id++;
+    this.vertices = params.vertices ?? [];
+    this.worldVertices = [];
+    for(let i = 0; i < this.vertices.length; i++) {
+      this.worldVertices.push(new vec2());
+    };
+  }
+  
+  computeWorldVertices() {
+    for(let idx = 0; idx < this.worldVertices.length; idx++) {
+      this.vertices[idx].rotate2(this.sinCache, this.cosCache, this.worldVertices[idx]).add(this.pos);
+    }
+    return this.worldVertices;
+  }
+  
+  computeAABB() {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for(let i = 0; i < this.worldVertices.length; i++) {
+      const v = this.worldVertices[i];
+      minX = Math.min(v.x, minX);
+      maxX = Math.max(v.x, maxX);
+      minY = Math.min(v.y, minY);
+      maxY = Math.max(v.y, maxY);
+    }
+    this.aabb[0] = minX;
+    this.aabb[1] = maxX;
+    this.aabb[2] = minY;
+    this.aabb[3] = maxY;
+  }
+  
+  render(ctx) {
+    ctx.beginPath();
+    ctx.strokeStyle = this.color;
+    if(this.fill) ctx.fillStyle = this.color;
+    ctx.moveTo(0, 0);
+    for(const vertex of this.vertices) {
+      ctx.lineTo(vertex.x, vertex.y)
+    }
+    ctx.lineTo(this.vertices[0].x, this.vertices[0].y);
+    ctx.stroke();
+    if(this.fill) ctx.fill();
+    ctx.closePath();
+  }
+  
+}
+class Circle extends Body {
+  
+  constructor(params = {}) {
+    super(params);
+    this.id = Body._id++;
+    this.r = params.r ?? 10;
+  }
+  
+  render(ctx) {
+    ctx.beginPath();
+    ctx.strokeStyle = this.color;
+    if(this.fill) ctx.fillStyle = this.color;
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, this.r, 0, 2 * Math.PI);
+    ctx.stroke();
+    if(this.fill) ctx.fill();
+    ctx.closePath();
+  }
+  
+  computeAABB() {
+    this.aabb[0] = this.pos.x - this.r;
+    this.aabb[1] = this.pos.x + this.r;
+    this.aabb[2] = this.pos.y - this.r;
+    this.aabb[3] = this.pos.y + this.r;
+  }
+  
+}
+
+class Camera {
+  constructor(x = 0, y = 0, target = null, params = {}) {
+    this.pos = new vec2(x, y);
+    this.target = target;
+    this.bounds = params.bounds;
+    this.angle = params.angle || 0;
+    this.zoom = params.zoom ?? 1;
+    this.targetZoom = this.zoom;
+    this.speed = params.speed ?? 1;
+    
+    this.shakeIntensity = 0;
+    this.shakeDuration = 0;
+    this.shakeOffset = new vec2();
+  }
+
+  setTarget(target, x = null, y = null) {
+    this.target = target;
+    if(x !== null) this.pos.x = x;
+    if(y !== null) this.pos.y = y;
+  }
+
+  shake(shakeIntensity, shakeDuration) {
+    this.shakeIntensity = shakeIntensity;
+    this.shakeDuration = shakeDuration;
+  }
+
+  update(dt = 0.01) {
+    const t = 1 - Math.exp(-dt * this.speed);
+    if(this.target) {
+      this.pos.lerp(this.target.pos, t);
+    }
+   
+    this.zoom += (this.targetZoom - this.zoom) * t * 1;
+    if(Math.abs(this.zoom - this.targetZoom) < 0.0001) this.zoom = this.targetZoom;
+
+    if(this.bounds) {
+      this.pos.x = Math.max(this.bounds.minX, Math.min(this.pos.x, this.bounds.maxX));
+      this.pos.y = Math.max(this.bounds.minY, Math.min(this.pos.y, this.bounds.maxY));
+    }
+
+    if(this.shakeDuration > 0) {
+      this.shakeDuration -= dt;
+      this.shakeOffset.x = (Math.random() * 2 - 1) * this.shakeIntensity;
+      this.shakeOffset.y = (Math.random() * 2 - 1) * this.shakeIntensity;
+
+      this.shakeIntensity *= 0.99;
+
+      if(this.shakeDuration <= 0) {
+        //this.shakeOffset.set(0, 0);
+        this.shakeIntensity = 0;
+      }
+    } else if(this.shakeOffset.x !== 0 || this.shakeOffset.y !== 0) {
+      this.shakeOffset.x -= this.shakeOffset.x * t;
+      this.shakeOffset.y -= this.shakeOffset.y * t;
+      if(Math.abs(this.shakeOffset.x) < 0.0001) this.shakeOffset.x = 0;
+      if(Math.abs(this.shakeOffset.y) < 0.0001) this.shakeOffset.y = 0;
+    }
+
+  }
+  
+  setZoom(z) {
+    this.targetZoom = z;
+  }
+
+  get x() {
+    if(this.bounds) {
+      return Math.max(this.bounds.minX, Math.min(this.pos.x + this.shakeOffset.x, this.bounds.maxX));
+    }
+    return this.pos.x + this.shakeOffset.x;
+  }
+  
+  get y() {
+    if(this.bounds) {
+      return Math.max(this.bounds.minY, Math.min(this.pos.y + this.shakeOffset.y, this.bounds.maxY));
+    }
+    return this.pos.y + this.shakeOffset.y;
+  }
+
+
+}
+
+class InputManager {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.bindings = new Map();
+    this.inputs = new Map();
+    this.pressedQueue = new Set();
+    this.releasedQueue = new Set();
+    this.pointer = { screenX: 0, screenY: 0, canvasX: 0, canvasY: 0 };
+    
+    this._initEventListeners();
+  }
+  
+  bind(action, ...codes) {
+    if(!this.bindings.has(action)) this
+    .bindings.set(action, new Set());
+    const codesSet = this.bindings.get(action);
+    for(let i = 0; i < codes.length; i++) {
+      codesSet.add(codes[i]);
+    }
+  }
+  unbind(action, ...codes) {
+    if(!this.bindings.has(action)) return;
+    for(let i = 0; i < codes.length; i++) {
+      this.bindings.get(action).delete(codes[i]);
+    }
+  }
+  
+  _initEventListeners() {
+    window.addEventListener("keydown", e => {
+      if(e.repeat) return;
+      this.handleInputStart(e.code);
+    })
+    window.addEventListener("keyup", e => {
+      this.handleInputEnd(e.code);
+    })
+    this.canvas.addEventListener("pointerdown", e => {
+      this.handleInputStart(`Pointer-${e.button}`);
+    })
+    
+    this.canvas.addEventListener("pointermove", e => {
+      this.updatePointerCoordinates(e);
+    })
+    this.canvas.addEventListener("pointerup", e => {
+      this.handleInputEnd(`Pointer-${e.button}`);
+    })
+    this.canvas.addEventListener("contextmenu", e => e.preventDefault());
+  }
+  
+  handleInputStart(code) {
+    if(this.inputs.has(code) && this.inputs.get(code)?.down) return;
+    this.pressedQueue.add(code);
+  }
+  
+  handleInputEnd(code) {
+    this.releasedQueue.add(code);
+  }
+  
+  updatePointerCoordinates(e) {
+    this.pointer.screenX = e.clientX;
+    this.pointer.screenY = e.clientY;
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    this.pointer.canvasX = (e.clientX - rect.left) * scaleX;
+    this.pointer.canvasY = (e.clientY - rect.top) * scaleY;
+  }
+  
+  update() {
+    
+    for(const state of this.inputs.values()) {
+      state.released = false;
+      state.down = false;
+    }
+    
+    for(const code of this.pressedQueue) {
+      let state = this.inputs.get(code);
+      if(!state) {
+        state = { pressed: false, down: false, released: false };
+        this.inputs.set(code, state);
+      }
+      state.pressed = true;
+      state.down = true;
+    }
+    this.pressedQueue.clear();
+    
+    for(const code of this.releasedQueue) {
+      const state = this.inputs.get(code);
+      if(state) {
+        state.pressed = false;
+        state.released = true;
+      }
+    }
+    this.releasedQueue.clear();
+    
+  }
+  
+  
+  isDown(action) {
+    const codes = this.bindings.get(action);
+    if(!codes) return false;
+    for(const code of codes) {
+      if(this.inputs.get(code)?.down) return true;
+    }
+    return false;
+  }
+  
+  isPressed(action) {
+    const codes = this.bindings.get(action);
+    if(!codes) return false;
+    for(const code of codes) {
+      if(this.inputs.get(code)?.pressed) return true;
+    }
+    return false;
+  }
+  
+  isReleased(action) {
+    const codes = this.bindings.get(action);
+    if(!codes) return false;
+    for(const code of codes) {
+      if(this.inputs.get(code)?.released) return true;
+    }
+    return false;
+  }
+  
+}
+
+class Engine {
+  constructor(selector) {
+    this.canvas = document.querySelector(selector);
+    this.ctx = this.canvas.getContext("2d");
+    
+    this.inputManager = new InputManager(this.canvas);
+    //this.dpr = window.devicePixelRatio || 1;
+    //this.setCanvasSize(window.innerWidth, window.innerHeight);
+    //this.screenAspectRatio = this.canvas.width / this.canvas.height;
+    //this.keepAspectRatio = false;
+    window.addEventListener("resize", () => this.resizeCanvas());
+    this.resizeCanvas();
+    
+    this.running = false;
+    this.res = new Assets();
+    
+    this.fps = null;
+    this.frames = 0;
+    this.t0 = 0;
+    this.t1 = 0;
+    this.dt = 0;
+    
+    this.camera = new Camera(0, 0);
+    this.renderAABBs = false;
+    
+    this.entities = [];
+    
+  }
+  
+  /*
+  setCanvasSize(w, h) {
+    this.canvas.width = w * this.dpr;
+    this.canvas.height = h * this.dpr;
+    this.canvas.style.width = `${w}px`;
+    this.canvas.style.height = `${h}px`;
+    this.screenAspectRatio = w / h;
+  }
+  */
+  
+  resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = Math.floor(this.canvas.clientWidth * dpr);
+    this.canvas.height = Math.floor(this.canvas.clientHeight * dpr);
+  }
+  
+  /*
+  resizeCanvas() {
+    if(!this.keepAspectRatio) {
+      this.setCanvasSize(window.innerWidth, window.innerHeight);
+      return;
+    }
+    let w = window.innerWidth;
+    const h = window.innerHeight;
+    const hp = w / this.screenAspectRatio;
+    
+    if(hp > h) {
+      w = h * this.screenAspectRatio;
+      this.setCanvasSize(w, h);
+      return;
+    } else {
+      this.setCanvasSize(w, hp);
+      return;
+    }
+  }
+  */
+  
+  async start(...manifest) {
+    await this.res.load(...manifest);
+    this.initScene();
+    this.running = true;
+    this.t0 = performance.now();
+    this.t1 = this.t0;
+    this.rafId = requestAnimationFrame(this.loop);
+  }
+  
+  initScene() {
+    
+  }
+  
+  loop = (t) => {
+    this.rafId = requestAnimationFrame(this.loop);
+    this.calcDtandFps(t);
+    this.update(this.dt);
+    infoElm.textContent = `
+      fps: ${this.fps} | e: ${this.entities.length} | vec2: ${vec2.count} | camera: (${this.camera.x.toFixed(1)}, ${this.camera.y.toFixed(1)}, z-${this.camera.zoom.toFixed(2)}) | joystick: (${this.joystick.x.toFixed(2)}, ${this.joystick.y.toFixed(2)})
+    `;
+    this.render(this.ctx);
+  }
+  
+  calcDtandFps(t) {
+    this.dt = (t - this.t0) * 0.001;
+    this.t0 = t;
+    this.frames++;
+    if(t - this.t1 >= 1000) {
+      this.fps = this.frames;
+      //infoElm.textContent = this.fps;
+      this.frames = 0;
+      this.t1 += 1000;
+    }
+  }
+  
+  stop() {
+    if(this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.running = false;
+      this.rafId = null;
+    }
+  }
+  
+  render(ctx) {
+    const z = this.camera.zoom;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(z * dpr, 0, 0, z * dpr, 0, 0);
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    ctx.setTransform(z, 0, 0, z, - this.camera.x * z + this.canvas.width/2, - this.camera.y * z + this.canvas.height/2);
+    ctx.fillStyle = "rgb(197,239,255,0.05)";
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    for(const e of this.entities) {
+      if(this.renderAABBs) {
+        ctx.setTransform(z, 0, 0, z, (e.aabb[0] - this.camera.x) * z + this.canvas.width/2, (e.aabb[2] - this.camera.y) * z + this.canvas.height/2);
+        e.renderAABB(ctx);
+      }
+      ctx.setTransform(e.cosCache * z, e.sinCache * z, - e.sinCache * z, e.cosCache * z, (e.pos.x - this.camera.x) * z + this.canvas.width/2, (e.pos.y - this.camera.y) * z + this.canvas.height/2);
+      e.render(ctx);
+    }
+  }
+  
+  update(dt) {
+    this.camera.update(dt);
+    const im = this.inputManager;
+    im.update();
+    
+    this.entities[5].color = "#fff";
+    //if(im.isDown("mouse-click")) {
+      this.entities[5].pos.x = im.pointer.canvasX + this.camera.x - this.canvas.width / 2;
+      this.entities[5].pos.y = im.pointer.canvasY + this.camera.y - this.canvas.height / 2;
+    //}
+    
+    const { player } = this;
+    player.vel.x += this.joystick.x * player.speed;
+    player.vel.y += this.joystick.y * player.speed;
+    
+    if(im.isPressed("zoom-out")) {
+      this.camera.setZoom(0.5);
+    } else if(im.isPressed("zoom-in")) {
+      this.camera.setZoom(2);
+    } else {
+      this.camera.setZoom(1);
+    }
+    
+    /*if(im.isDown("zoom")) infoElm.textContent += "--down--";
+    if(im.isPressed("zoom")) infoElm.textContent += "--pressed--";
+    if(im.isReleased("zoom")) infoElm.textContent += "--up--";*/
+    //infoElm.textContent = `down: ${im.isDown("zoom")} | pressed: ${im.isPressed("zoom")} | released: ${im.isReleased("zoom")}`;
+    
+    for(const e of this.entities) {
+      e.update(dt);
+    }
+    
+  }
+  
+  addEntity(...entity) {
+    this.entities.push(...entity);
+  }
+  
+}
+
+function generateRegularPolyVertices(n, r = 30) {
+  const vertices = [];
+  const t = Math.PI * 2 / n;
+  for(let i = 0; i < n; i++) {
+    vertices.push(new vec2(Math.cos(i * t) * r, Math.sin(i * t) * r));
+  }
+  return vertices;
+}
+function random(min, max) {
+  return Math.random() * (max - min) + min;
+}
+function randint(min, max) {
+  return Math.floor(Math.random() * (max + 1 - min) + min);
+}
+function randColor(s = 100, l = 70) {
+  return `hsl(${random(0, 360)}, ${s}%, ${l}%)`;
+}
+
+
+
+const infoElm = document.querySelector("#infoElm");
+infoElm.addEventListener("dblclick", () => { document.documentElement.requestFullscreen(); });
+
+const engine = new Engine("canvas");
+//engine.setCanvasSize(360, 320);
+//engine.keepAspectRatio = true;
+function scene1() {
+  
+  const cw2 = engine.canvas.width * 0.5;
+  const ch2 = engine.canvas.height * 0.5;
+  
+  const p1 = new Polygon({
+    x: 0, y: 0, r: 50, angVel: 1.3, velX: 40, velY: 5, color: randColor(), fill: true, vertices: generateRegularPolyVertices(5, 30)
+  });
+  p1.speed = 10;
+  
+  engine.player = p1;
+  
+  engine.camera.setTarget(engine.player);
+  engine.camera.speed = 5;
+  /*setTimeout(() => {
+    engine.camera.setZoom(0.5);
+    engine.camera.shake(10, 5);
+    //engine.player.vel.scale(10);
+  }, 2000)
+  setTimeout(() => {
+    //engine.camera.setTarget(engine.entities[2]);
+    engine.camera.setZoom(1);
+  }, 5000)*/
+  
+  
+  for(let i = 0; i < 100; i++) {
+    let e;
+    const x = random(- cw2, 3 * cw2);
+    const y = random(- ch2, 3 * ch2);
+    const fill = randint(0, 1);
+    const color = randColor();
+    const angVel = random(-1, 1);
+    if(Math.random() < 0.5) {
+      e = new Circle({ x, y, fill, color, angVel, r: randint(5, 50) });
+    } else {
+      e = new Polygon({ x, y, fill, color, angVel, vertices: generateRegularPolyVertices(randint(3, 7), randint(20, 40)) });
+    }
+    
+    engine.addEntity(e);
+  }
+  engine.addEntity(p1);
+  
+  
+  //engine.renderAABBs = true;
+  
+  
+  const joystickElm = document.querySelector("#joystick-elm");
+  const joystick = new Joystick(joystickElm, 20, 40, 120);
+  engine.joystick = joystick;
+  
+  
+  
+  const im = engine.inputManager;
+  const btns = {
+    y: document.querySelector("#y-btn"),
+    r: document.querySelector("#r-btn")
+  };
+  im.bind("zoom-out", "TouchBtnR", "KeyR");
+  im.bind("zoom-in", "TouchBtnY", "KeyY");
+  im.bind("mouse-click", "Pointer-0");
+  
+  btns.r.addEventListener("pointerdown", () => {
+    im.handleInputStart("TouchBtnR");
+  })
+  btns.r.addEventListener("pointerup", () => {
+    im.handleInputEnd("TouchBtnR");
+  })
+  btns.y.addEventListener("pointerdown", () => {
+    im.handleInputStart("TouchBtnY");
+  })
+  btns.y.addEventListener("pointerup", () => {
+    im.handleInputEnd("TouchBtnY");
+  })
+  
+  if(engine.entities[5] instanceof Circle) {
+    engine.entities[5].r = 40;
+    engine.entities[5].fill = false
+  }
+  
+}
+engine.initScene = () => {
+  scene1();
+}
+const manifest = [];
+engine.start(...manifest);
+
+const controllerBtns = document.querySelectorAll(".controller-button");
+for(const controllerBtn of controllerBtns) {
+  controllerBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    controllerBtn.classList.add("active");
+  })
+  controllerBtn.addEventListener("pointerup", () => {
+    controllerBtn.classList.remove("active");
+  })
+  
+}
+
+</script>
+</body>
+</html>

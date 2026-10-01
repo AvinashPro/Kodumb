@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+
+* {
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: black;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+canvas {
+  width: 360px;
+  height: 360px;
+  border: 1px solid #fff2;
+  /*image-rendering: pixelated;*/
+}
+#infoLog {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: rgb(174,220,255);
+}
+  </style>
+</head>
+<body>
+  <canvas></canvas>
+  <div id="infoLog"></div>
+
+<script>
+const infoElm = document.querySelector("#infoLog");
+
+
+
+class Time {
+  t0 = 0;
+  t1 = 0;
+  t;
+  dt;
+  fps;
+  frames = 0;
+  constructor() { }
+  update(t) {
+    this.t = t;
+    this.dt = (this.t - this.t0) * 0.001;
+    this.t0 = this.t;
+    
+    this.t1 += this.dt;
+    this.frames++;
+    if(this.t - this.t1 >= 1000) {
+      this.t1 += 1000;
+      this.fps = this.frames;
+      infoElm.textContent = this.fps;
+      this.frames = 0;
+    }
+    
+  }
+  
+}
+const webglUtils = (() => {
+  
+  function compileShader(gl, type, src) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, src);
+    gl.compileShader(shader);
+    
+    if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(shader);
+      gl.deleteShader(shader);
+      throw new Error(`Failed to compile ${type === gl.VERTEX_SHADER ? "vertex" : "fragment"} shader! Info Log: ${log}`);
+    }
+    
+    return shader;
+  }
+  
+  function compileProgram(gl, vs_src, fs_src) {
+    const program = gl.createProgram();
+    const vs = compileShader(gl, gl.VERTEX_SHADER, vs_src);
+    const fs = compileShader(gl, gl.FRAGMENT_SHADER, fs_src);
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    
+    if(!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const log = gl.getProgramInfoLog(program);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      gl.deleteProgram(program);
+      throw new Error(`Failed to link program! Info Log: ${log}`);
+    }
+    
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
+    return program;
+  }
+  
+  return {
+    compileShader,
+    compileProgram
+  }
+  
+})();
+
+
+
+class App {
+  static _id = 0;
+  constructor(canvas) {
+    this._id = ++App._id;
+    this.canvas = canvas;
+    this.gl = canvas.getContext("webgl2");
+  }
+  
+  resizeCanvas() {
+    this.canvas.width = this.canvas.clientWidth;
+    this.canvas.height = this.canvas.clientHeight;
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+  }
+  
+  init(func) {
+    this.resizeCanvas();
+    this.time = new Time();
+    func(this);
+    requestAnimationFrame(this.loop);
+  }
+  
+  loop = (t) => {
+    requestAnimationFrame(this.loop);
+    this.time.update(t);
+    this.update(this.time.dt);
+    this.render(this.gl);
+  }
+  
+  update(dt) { }
+  render() { }
+  
+  
+}
+
+class Renderer {
+  
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.geometries = {};
+    this.programs = {};
+    this.vaos = {};
+    this.projectionMatrix = new Float32Array(16);
+    this.populateGeometry();
+  }
+  
+  populateGeometry() {
+    this.geometries.quad = {
+      vertices: new Float32Array([
+        -0.5, 0.5,
+        -0.5, -0.5,
+        0.5, -0.5,
+        -0.5, 0.5,
+        0.5, -0.5,
+        0.5, 0.5
+      ])
+    };
+  }
+  
+  updateProjectionMatrix(l, r, t, b, n, f) {
+    const d = this.projectionMatrix;
+    d[0] = 2 / (r - l); d[1] = 0; d[2] = 0; d[3] = 0;
+    d[4] = 0; d[5] = 2 / (t - b); d[6] = 0; d[7] = 0;
+    d[8] = 0; d[9] = 0; d[10] = -2 / (f - n); d[11] = 0;
+    d[12] = - (r + l) / (r - l);
+    d[13] = - (t + b) / (t - b);
+    d[14] = -(f + n) / (f - n);
+    d[15] = 1;
+    return this;
+  }
+  
+}
+
+class Entity {
+  constructor(params = {}) {
+    this.pos = [params.x ?? 0, params.y ?? 0];
+    this.vel = [0, 0];
+    this.w = params.w ?? 10;
+    this.h = params.h ?? 10;
+    this.angle = params.angle || 0;
+    this.angVel = params.angVel || 0;
+  }
+  update(dt) {
+    this.pos[0] += this.vel[0] * dt;
+    this.pos[1] += this.vel[1] * dt;
+    this.angle += this.angVel * dt;
+  }
+}
+
+function updateEntitiesTransform(entities, buffer) {
+  
+  let offset = 0;
+  for(let i = 0; i < entities.length; i++) {
+    const e = entities[i];
+    buffer[offset] = e.pos[0];
+    buffer[offset+1] = e.pos[1];
+    buffer[offset+2] = e.w;
+    buffer[offset+3] = e.h;
+    buffer[offset+4] = e.angle;
+    offset += 5;
+  }
+  
+  return buffer;
+  
+}
+
+
+const mainApp = new App(document.querySelector("canvas"));
+mainApp.init(e => {
+  const { gl, canvas } = e;
+  e.renderer = new Renderer(canvas);
+  const r = e.renderer;
+  r.updateProjectionMatrix(0, canvas.width, 0, canvas.height, -1000, 1000);
+  
+  e.entities = [];
+  const { entities } = e;
+  for(let i = 0; i < 100; i++) {
+    const ne = new Entity({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      w: Math.random() * 30 + 10,
+      h: Math.random() * 30 + 10,
+      angVel: Math.random() * 2 - 1
+    });
+    ne.vel = [Math.random() * 50 - 25, Math.random() * 50 - 25];
+    entities.push(ne);
+  }
+  
+  const vs_s1 = `#version 300 es
+    layout(location=0) in vec2 a_pos;
+    layout(location=1) in vec2 a_wPos;
+    layout(location=2) in vec2 a_dimension;
+    layout(location=3) in float a_angle;
+    uniform mat4 u_projectionMatrix;
+    
+    void main() {
+      float s = sin(a_angle);
+      float c = cos(a_angle);
+      mat2 m_roate = mat2(c, s, -s, c);
+      
+      gl_Position = u_projectionMatrix * vec4(m_roate * (a_pos * a_dimension) + a_wPos + a_dimension / 2.0, 0.0, 1.0);
+    }
+  `;
+  const fs_s1 = `#version 300 es
+    precision mediump float;
+    
+    out vec4 FragColor;
+    
+    void main() {
+      FragColor = vec4(0.0, 0.6, 0.9, 1.0);
+    }
+  `;
+  const program = webglUtils.compileProgram(gl, vs_s1, fs_s1);
+  r.programs.mainProgram = program;
+  gl.useProgram(program);
+  
+  
+  const vertexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, r.geometries.quad.vertices, gl.STATIC_DRAW);
+  
+  const vao = gl.createVertexArray();
+  r.vaos.vao1 = vao;
+  gl.bindVertexArray(vao);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(0, 0);
+  //gl.bindVertexArray(null);
+  
+  
+  const transformBuffer = gl.createBuffer();
+  
+  e.entitiesTransformData = new Float32Array(entities.length * 4);
+  const transformData = updateEntitiesTransform(entities, e.entitiesTransformData);
+  e.transformBuffer = transformBuffer;
+  
+  
+  gl.bindBuffer(gl.ARRAY_BUFFER, transformBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, transformData, gl.DYNAMIC_DRAW);
+  
+  gl.enableVertexAttribArray(1);
+  gl.enableVertexAttribArray(2);
+  gl.enableVertexAttribArray(3);
+  gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 0);
+  gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 20, 8);
+  gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 20, 16);
+  gl.vertexAttribDivisor(1, 1);
+  gl.vertexAttribDivisor(2, 1);
+  gl.vertexAttribDivisor(3, 1);
+  gl.bindVertexArray(null);
+  
+  
+  const loc = gl.getUniformLocation(program, "u_projectionMatrix");
+  gl.uniformMatrix4fv(loc, false, r.projectionMatrix);
+  
+});
+
+
+mainApp.update = (dt) => {
+  const { entities } = mainApp;
+  for(const e of entities) {
+    e.update(dt);
+  }
+  
+}
+
+mainApp.render = (gl) => {
+  gl.clearColor(0.0, 0.05, 0.1, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  
+  const r = mainApp.renderer;
+  const e = mainApp.entities;
+  const d = mainApp.entitiesTransformData;
+  const b = mainApp.transformBuffer;
+  
+  
+  
+  updateEntitiesTransform(e, d);
+  gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, d);
+  
+  gl.bindVertexArray(r.vaos.vao1);
+  gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, e.length);
+  
+  
+}
+
+console.log(mainApp);
+
+</script>
+
+</body>
+</html>

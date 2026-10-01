@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>WebGL2 - n</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      max-height: 100vh;
+      height: 100vh;
+      overflow-y: hidden;
+      display: grid;
+      place-items: center;
+    }
+  </style>
+</head>
+<body>
+  <canvas></canvas>
+<script>
+  const canvas = document.querySelector("canvas");
+  const gl = canvas.getContext("webgl2");
+  function resizeCanvas(w = window.innerWidth, h = window.innerHeight) {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  window.onresize = () => { resizeCanvas(); }
+  resizeCanvas();
+  
+  
+  
+  
+  
+  
+  
+</script>
+</body>
+</html>

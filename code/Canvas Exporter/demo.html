@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  display: grid;
+  height: 100vh;
+  place-items: center;
+  background: rgb(10, 20, 30);
+}
+canvas {
+  border: 1px solid rgb(15,40,88);
+  width: 360px;
+  height: 270px;
+}
+
+
+
+
+  </style>
+</head>
+<body>
+  <canvas></canvas>
+  <section id="exp1"></section>
+  
+<script type="module">
+
+import { CanvasExporter } from "./exporter.js"
+
+const canvas = document.querySelector("canvas");
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(canvas.clientWidth * dpr);
+  canvas.height = Math.floor(canvas.clientHeight * dpr);
+}
+resizeCanvas();
+const ctx = canvas.getContext("2d");
+const ball = {
+  x: 0, y: 50, r: 10, col: "#09f", vx: 50, vy: 20
+};
+
+
+
+function updateFrame(dt) {
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
+}
+function renderFrame(ctx) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.fillStyle = ball.col;
+  ctx.arc(ball.x, ball.y, ball.r, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.closePath();
+  
+}
+const exporter = new CanvasExporter(canvas, updateFrame, renderFrame, {
+  skipFrames: 5,
+  fps: 90
+});
+exporter.init("#exp1");
+
+
+//const exporterElm = document.querySelector("#exp1");
+
+
+console.log(exporter)
+
+
+</script>
+  
+</body>
+</html>

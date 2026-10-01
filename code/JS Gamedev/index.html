@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>JS Game dev 01</title>
+  <link rel="stylesheet" href="https://raw.githack.com/PrismJS/prism-themes/master/themes/prism-dracula.css"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap');
+    @import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css");
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Google Sans";
+    }
+    
+    body {
+      background: rgb(4,10,25);
+    }
+    
+    nav {
+      width: 100vw;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      gap: 10px;
+    }
+    nav img {
+      width: 30px;
+      height: 30px;
+    }
+    nav span {
+      color: rgb(132,234,254);
+      font-weight: 800;
+    }
+    
+    .container {
+      width: 85vw;
+      margin: auto;
+      max-width: 900px;
+      padding-bottom: 40px;
+    }
+    
+    .heading {
+      position: relative;
+      font-size: 36px;
+      color: rgb(238,252,255);
+      font-weight: 400;
+      margin-bottom: 10px;
+    }/*
+    .heading::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgb(31,202,239);
+      filter: blur(20px);
+    }
+    .heading::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 40px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgb(0,252,173);
+      filter: blur(20px);
+    }*/
+    .content {
+      color: rgb(221,249,255);
+      text-indent: 10px;
+    }
+    .gap {
+      margin: 80px 0;
+    }
+    .subheading {
+      font-size: 24px;
+      font-weight: 400;
+      color: rgb(228,246,255);
+      margin-left: 10px;
+      margin-top: 10px;
+    }
+    .note {
+      width: 100%;
+      min-height: 100px;
+      border: 2px solid rgb(12,94,135);
+      border-bottom-width: 5px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      background: rgb(8,40,56);
+      color: rgb(160,223,255);
+      padding: 10px;
+      margin: 10px 0;
+      
+    }
+    .note i {
+      font-size: 30px;
+    }
+    .note p {
+      font-weight: 800;
+      font-size: 20px;
+      color: rgb(108,206,255);
+    }
+    
+    canvas {
+      display: block;
+      margin: auto;
+    }
+    
+    .sidenote {
+      font-size: 12px;
+      color: rgb(168,211,231);
+      text-align: center;
+      margin-bottom: 20px;
+      margin-top: 5px;
+    }
+    
+    button {
+      border: none;
+      outline: none;
+      padding: 10px;
+      border-radius: 6px;
+      background: rgb(0,98,223);
+      color: rgb(233,248,255);
+      user-select: none;
+      transition: 0.3s ease;
+    }
+    button:hover {
+      background: rgb(0,74,169);
+      transform: scale(1.01);
+    }
+    .progress-bar {
+      position: relative;
+      border: 2px solid rgb(0,120,246);
+      padding: 5px;
+      width: 150px;
+      height: 35px;
+      margin-top: 10px;
+      display: grid;
+      place-items: center;
+      color: rgb(227,240,255);
+      font-size: 10px;
+      display: none;
+    }
+    .progress-bar span {
+      z-index: 1;
+    }
+    .progress-bar div {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      width: 0px;
+      height: calc(100% - 10px);
+      background: rgb(0,120,246);
+      transition: 0.3s ease;
+    }
+    
+    .imp {
+      background: rgb(4,25,20);
+      border-color: rgb(4,25,20);
+      color: rgb(197,254,241);
+    }
+    .imp p {
+      color: rgb(67,250,208);
+    }
+    
+  </style>
+</head>
+<body>
+  
+  <nav>
+    <!--<img src="../favicon.png" alt="">-->
+    <span>JS Game Development 01</span>
+  </nav>
+  
+  <div class="container">
+    <div style="margin-top:30px;"></div>
+    <div class="heading">Introduction</div>
+    <div class="content">
+      In this series of tutorial, my goal is to teach you how to make a 2D Platformer Game from scratch without any library or engine. I'll put great emphasis on optimization as it's a crucial element for any game. It is assumed here that you have already worked with Canvas API before. 
+    </div>
+    
+    <div class="gap"></div>
+    
+    <div class="heading">Utilities</div>
+    <div class="content">
+      Let's start with making some utilities, i.e. helper functions.
+    </div>
+    
+    <div class="subheading">1. createCanvas()</div>
+    
+<pre><code class="language-javascript">function createCanvas(w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  const canvas = document.createElement("canvas");
+  
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.scale(dpr, dpr);
+  
+  return canvas;
+}</code></pre>
+    <div class="content">
+      This function helps us to create dpr scaled canvas.
+    </div>
+    
+    
+    <div class="note">
+      <i class="fa-regular fa-note-sticky"></i>
+      <div>
+        <p>Note</p>
+        <span>We are using dpr scaled canvas because it gives clear rendering. The imageSmoothingEnabled is set to false because without it image will be blurry. See below example</span>
+      </div>
+    </div>
+    <canvas id="canvas1"></canvas>
+    <div class="sidenote">Canvas without dpr scaling</div>
+    <div id="canvas2"></div>
+    <div class="sidenote">Canvas with dpr scaling</div>
+    
+    
+    
+    
+    <div class="subheading">2. AssetLoader class</div>
+<pre><code class="language-javascript">/*
+Example data to load
+{
+  "player": {url: "res/img/abc.img", type: "Img"},
+  "levels": {url: "res/json/level.json", type: "JSON"},
+  "song": {url: "res/music/song.mp3", type: "Audio"}
+}
+
+*/
+
+class AssetLoader {
+  constructor() {
+    this.assets = new Map();
+  }
+  
+  load(data = {}, callback) {
+    
+    this.itemsLoaded = 0;
+    this.itemsToLoad = Object.keys(data).length;
+    
+    if(this.itemsToLoad == 0) {
+      callback();
+      return;
+    }
+    
+    for(const [name, props] of Object.entries(data)) {
+      this[`load${props.type}`](props.url).then(value => {
+        
+        this.assets.set(name, value);
+        this.itemsLoaded += 1;
+        this.progress = this.itemsLoaded / this.itemsToLoad;
+        
+        if(this.progress === 1) {
+          callback();
+        }
+        
+      }).catch(() => {
+        console.log("Some error occured!")
+      })
+      
+    }
+    
+  }
+  
+  loadImg(url) {
+    return new Promise((resolve, reject) => {
+      let img = new Image();
+      img.src = url;
+      img.onload = () => {
+        resolve(img);
+      }
+      img.onerror = () => {
+        reject();
+      }
+    })
+  }
+  
+  loadJSON(url) {
+    return new Promise((resolve, reject) => {
+      let request = fetch(url);
+      request.then(response => {
+        resolve(response.json());
+      }).catch(() => {
+        reject();
+      })
+    })
+  }
+  
+  loadAudio(url) {
+    return new Promise((resolve, reject) => {
+      let audio = new Audio();
+      audio.src = url;
+      audio.oncanplay = () => {
+        resolve(audio);
+      }
+      audio.onerror = () => {
+        reject();
+      }
+    })
+  }
+  
+  get(name) {
+    return this.assets.get(name);
+  }
+  
+}</code></pre>
+    <div class="content">Let's test our AssetLoader class. I'll load an image, a JSON file and my one of favorite song.</div>
+<pre><code class="language-javascript">let assetLoader = new AssetLoader();
+assetLoader.load({
+  "tileset": { url: "../Grotto%20Escape/assets/img/infinity.png", type: "Img" },
+  "level": { url: "../Grotto%20Escape/assets/json/tilemap.json", type: "JSON" },
+  "KimiNoMoji": { url:"../Kimi no Moji.mp3", type: "Audio" }
+  
+}, funcThatWillBeCalledAfterAssetsAreLoaded);
+
+/*
+
+function funcThatWillBeCalledAfterAssetsAreLoaded() {
+    console.log("Asset loaded! Now do whatever you want >_<");
+    let player = assetLoader.get("player");
+    let knm = assetLoader.get("KimiNoMoji");
+    let levelData = assetLoader.get("level");
+}
+
+*/</code></pre>
+  <button id="loadBtn1">Click here to load above Assets</button>
+  
+  <div class="note">
+      <i class="fa-regular fa-note-sticky"></i>
+      <div>
+        <p>Note</p>
+        <span>It may take some time to load beacuse it's more than 8 mb!</span>
+      </div>
+  </div>
+  <div class="progress-bar" id="progressBar1"><span>60%</span><div></div></div>
+    
+    <div id="assets-test"></div>
+    
+  
+  
+  
+  
+  
+    <div class="subheading">3. Vector class</div>
+    <div class="content">It's our last utility but a very important one! I'll give you a simple explanation (which is not quite accurate but serves our purpose for now). In physics, vectors are quantities that have both direction and magnitude. For example, consider a car going 5 km per hour (magnitude). But where? what's the direction? We see, velocity's description is pointless unless we define its direction, say north or 34° from +x-axis (direction) with respect to our chosen coordinate system.<br><br>"Why we need it?" you might ask. In a game, we have many entities such players, enemies, projectiles, tiles or background. Many entities have vector quantities such as position (x, y), velocity, acceleation etc. It becomes quite a nightmare if you don't find a clean way to organise and work with them. That's why we use vectors to represent them, store their data and perform logic (update)</div>
+<pre><code class="language-javascript">class Vector {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+  
+  // to add another vector
+  add(vec) {
+    this.x += vec.x;
+    this.y += vec.y;
+    return this;
+  }
+  
+  // to subtract another vector
+  sub(vec) {
+    this.x -= vec.x;
+    this.y -= vec.y;
+    return this;
+  }
+  
+  // to scale vector by a given factor
+  mult(k) {
+    this.x *= k;
+    this.y *= k;
+    return this;
+  }
+  
+  // to set our vector to given (x,y) components
+  set(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+  
+  // magnitude of vector
+  mag() {
+    return Math.hypot(this.x, this.y);
+  }
+  
+  // to make copy of the vector so we can manipulate this copied vector without changing the original one
+  copy() {
+    return new Vector(this.x, this.y);
+  }
+  
+  // to find a vector with magnitude 1 that points in the same direction
+  unit() {
+    return this.copy().mult(1 / this.mag());
+  }
+  
+  // that's it for now
+  // we will add more useful methods such as dot product, normal, rotate, lerp, ... later when we need them >_<
+  
+  
+}
+
+
+// lets see an example 
+let playerPos = new Vector(10, 50); // x = 10 and y = 50
+let playerVel = new Vector(0.5, 0); // vel in x-direction is 0.5 and that in y-direction is 0 
+
+update(dt) {
+  playerVel.mult(0.99); // friction
+  playerPos.add(playerVel.copy().mult(dt));
+}
+</code></pre>
+    
+    <div class="note">
+      <i class="fa-regular fa-note-sticky"></i>
+      <div>
+        <p>Optimization Note</p>
+        <span>Remember it's always better to reuse the old objects rather than creating new objects (if possible) for high performance.<br><br>For instance, I could have used<br><i style="font-size:16px;font-weight:800;">return new Vector(this.x + vec.x, this.y + vec.y);</i><br>in add(vec) function but chose not to as it requires creating new object</span>
+      </div>
+    </div>
+    
+    <div class="gap"></div>
+    <div class="heading">Game Loop</div>
+    <div class="content">Let's start by creating a game loop function with fps counter</div>
+<pre><code class="language-javascript">let loader = new AssetLoader();
+let assetToLoad = {
+  "tileset": { url: "../Grotto%20Escape/assets/img/infinity.png", type: "Img"},
+  "level": { url: "../Grotto%20Escape/assets/json/tilemap.json", type: "JSON" }
+};
+loader.load(assetToLoad, main);
+
+function main() {
+  canvas = createCanvas(320, 180);
+  ctx = canvas.getContext("2d");
+  
+  document.body.append(canvas);
+  
+  
+  now = then = frameThen = performance.now();
+  frames = 0;
+  fps = 0;
+  dt = 0;
+  
+  loop();
+}
+
+function drawText(ctx, text, x = 0, y = 0, size = 12, fontFamily = "Sans-serif") {
+  ctx.font = `${size}px ${fontFamily}`;
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.fillText(text, x, y);
+}
+
+function loop() {
+  requestAnimationFrame(loop);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // calculate dt and fps
+  now = performance.now();
+  dt = (now - then) / 1000;
+  if(now - frameThen > 1000) {
+    fps = frames;
+    frames = 0;
+    frameThen = now;
+  } else {
+    frames += 1;
+  }
+  then = now;
+  
+  
+  
+  
+  // render fps
+  drawText(ctx, `FPS: ${fps}`, 30, 20)
+  
+  
+
+  
+}</code></pre>
+  
+  <div id="canvas4"></div>
+  
+  <div class="note">
+      <i class="fa-regular fa-note-sticky"></i>
+      <div>
+        <p>Note</p>
+        <span>Maximum FPS depends on your device's screen refresh rate</span>
+      </div>
+    </div>
+  
+  
+  
+  
+    <div class="gap"></div>
+    <div class="heading">Tilemap</div>
+    <div class="content">Let's create our Tilemap class. We're using 2d array that we loaded earlier. We could have used 1d version for tilemap (1d array contains only numbers so we would have to separate them into rows and columns manually</div>
+<pre><code class="language-javascript">// 1d array - Faster
+let array1 = [1,2,3,4,5,6,7,8,9];
+
+// Same array but in 2d - A bit slower than 1d array
+let array2 = [
+  [1,2,3],
+  [4,5,6],
+  [7,8,9]
+];</code></pre>
+    <div class="note">
+      <i class="fa-regular fa-note-sticky"></i>
+      <div>
+        <p>Optimization Note</p>
+        <span>1d array is better for performance than 2d array. However, we're going to use 2d array as it is a lot easier to work with and understand. You can always make transition to 1d once you're comfortable with 2d</span>
+      </div>
+    </div>
+    
+    <div class="note">
+      <i class="fa-regular fa-note-sticky"></i>
+      <div>
+        <p>Optimization Note</p>
+        <span>We're going to divide our big tilemap into small chunks (which is nothing but a canvas) say 16 tiles × 16 tiles, do calculations to render all the tiles to their corresponding chunks and store all the chunks. These stored chunks are like images, we would then just draw the visible chunks to our main canvas.<br><br>You might ask "why the need of chunk based tilemap? Can't we do it the simple way?" Yes, you can do it in a simple way but that approach gives low performance and not suitable for big tilemaps. That's why we're using chunk based tilemap.</span>
+      </div>
+    </div>
+    
+<pre><code class="language-javascript">class Tilemap {
+  constructor(tileset, tilesetDim, data, tilesize = 16, chunkSize = 16) {
+    this.tileset = tileset; // tileset image
+    this.tilesetDim = tilesetDim; // dimension of image. we are using 11×5 image. it's stored as an array [11, 5]
+    this.data = data; // JSON data of map
+    this.tilesize = tilesize; // actual render size of each tile
+    this.chunks = new Map(); // container of canvas for each chunk. We will prerender each chunk then store it so that we can render it without recalculating stuff again
+    this.chunkSize = chunkSize; // it determines the size of each chunk. for example if chunkSize is 10 and our tilemap is 50×50 tiles then we would have total 5×5 = 25 chunks (each chunk is 10 tiles × 10 tiles (rows × columns))
+    this.cx_max = Math.ceil(this.data[0].length / this.chunkSize); // total number of chunk in x-direction
+    this.cy_max = Math.ceil(this.data.length / this.chunkSize); // total number of chunk in y-direction
+    
+  }
+  
+  // init() is only a one time function. Once we prerender all chunks, we don't have to recalculate everything and can just draw right away.
+  init() {
+    
+    let rows = this.data.length;
+    let columns = this.data[0].length;
+    
+    let sw = this.tileset.width / this.tilesetDim[0]; // source width
+    let sh = this.tileset.height / this.tilesetDim[1]; // source height
+    
+    
+    this.data.forEach((row, rIdx) => {
+      row.forEach((tile, cIdx) => {
+        
+        let chunk_y = Math.floor(rIdx / this.chunkSize); // y coordinate of chunk such as 0, 1, 2, 3 (we have only 4 chunks in y-direction remember)
+        
+        // Note: cx refers to chunk x coordinate (in our particular case it could be 0,1,2,3 as each row of tilemap is 50 tiles wide and each chunk is 16 (default) tiles wide). Same goes for cy.
+        // first lemme explain how canvases are stored in this.chunks. this.chunks contains cy—Map() pair, each cy stores all possible values of cx—Map() pair and this cx contains our canvas of that chunk in Map();
+        /* Think of it as something like:
+        this.chunks = new Map(
+          0 (cy) -> new Map(
+              0 (cx) -> new Map(chunk canvas of (0,0)),
+              1 -> new Map(chunk canvas of (1,0)),
+              2 -> new Map(chunk canvas of (2,0)),
+              3 -> new Map(chunk canvas of (3,0))
+            ),
+          1 (cy) -> new Map(
+              0 (cx) -> new Map(chunk canvas of (0,1)),
+              1 -> new Map(chunk canvas of (1,1)),
+              2 -> new Map(chunk canvas of (2,1)),
+              3 -> new Map(chunk canvas of (3,1))
+            ),
+            .... and so on!
+        )
+        */
+        if(!this.chunks.has(chunk_y)) this.chunks.set(chunk_y, new Map());
+        
+        
+        let chunk_x = Math.floor(cIdx / this.chunkSize);
+        if(!this.chunks.get(chunk_y).has(chunk_x)) {
+          let offcanvas = document.createElement("canvas");
+          offcanvas.width = offcanvas.height = this.chunkSize * this.tilesize;
+          
+          this.chunks.get(chunk_y).set(chunk_x, offcanvas);
+        }
+        
+        let chunk_canvas = this.chunks.get(chunk_y).get(chunk_x);
+        let ctx = chunk_canvas.getContext("2d");
+        
+        
+        
+        let sx = ((tile - 1) % this.tilesetDim[0]) * sw;
+        let sy = Math.floor((tile - 1) / this.tilesetDim[0]) * sh;
+        
+        let dx = (cIdx % this.chunkSize) * this.tilesize;
+        let dy = (rIdx % this.chunkSize) * this.tilesize;
+        
+        ctx.drawImage(this.tileset, sx, sy, sw, sh, dx, dy, this.tilesize, this.tilesize); // draw tile to our chunk
+        
+        
+      })
+    })
+    
+  }
+  
+  render(ctx) {
+    
+    
+    // render all chunks in game loop function. I know it's not a good idea to draw all chunks. We'll draw only visible chunks in next tutorial. For now let's just enjoy >_<
+    for(let cy = 0; cy < this.cy_max; cy++) {
+      for(let cx = 0; cx < this.cx_max; cx++) {
+        let chunk = this.chunks.get(cy).get(cx); // chunk canvas
+        ctx.drawImage(chunk, 0, 0, chunk.width, chunk.height, cx * chunk.width, cy * chunk.height, chunk.width, chunk.height); // draw chunk to our main canvas
+        
+      }
+    }
+    
+  }
+  
+}
+
+
+
+// Create tilemap in main() function and initialize it.
+tilemap = new Tilemap(loader.get("tileset"), [11, 5], loader.get("level").data);
+tilemap.init();
+
+
+// In loop() function 
+tilemap.render(ctx);
+drawText(ctx, `FPS: ${fps}`, 30, 20); // fps
+
+
+</code></pre>
+    <div id="canvas5"></div>
+    <div class="content">That's it for now though there are more things I would like to do but anyways let's save that for later. Don't worry about Camera for now.</div>
+    
+    <div class="gap"></div>
+    <div class="heading">Conclusion</div>
+    <div class="content">Alright that's it for this tutorial. If you read this till the end, Congratulations! We will implement <b>Entity</b>, <b>Camera</b>, <b>Tilemap collision detection and resolution</b> and hopefully <b>Spatial Hashing (Broad Phase Collision)</b> in the next tutorial</div>
+    
+    <div class="content" style="text-align:right;margin-top:10px;font-size:10px;">See you later,<br>Mob</div>
+    
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/prism.min.js" integrity="sha512-UOoJElONeUNzQbbKQbjldDf9MwOHqxNz49NNJJ1d90yp+X9edsHyJoAs6O4K19CZGaIdjI5ohK+O2y5lBTW6uQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script id="utils">
+function createCanvas(w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  const canvas = document.createElement("canvas");
+  
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.scale(dpr, dpr);
+  
+  return canvas;
+}
+
+/*
+Example data to load
+{
+  "player": {url: "res/img/abc.img", type: "Img"},
+  "levels": {url: "res/json/level.json", type: "JSON"},
+  "kimi no moji": {url: "res/music/KimiNoMoji.mp3", type: "Audio"}
+}
+
+*/
+
+class AssetLoader {
+  constructor() {
+    this.assets = new Map();
+  }
+  
+  load(data = {}, callback) {
+    this.itemsLoaded = 0;
+    this.itemsToLoad = Object.keys(data).length;
+    if(this.itemsToLoad == 0) {
+      callback();
+      return;
+    }
+    
+    for(const [name, props] of Object.entries(data)) {
+      this[`load${props.type}`](props.url).then(value => {
+        
+        this.assets.set(name, value);
+        this.itemsLoaded += 1;
+        this.progress = this.itemsLoaded / this.itemsToLoad;
+        document.getElementById("progressBar1").querySelector("span").textContent = Math.floor(this.progress * 100) + "%";
+        document.getElementById("progressBar1").querySelector("div").style.width = `calc(${Math.floor(this.progress * 100)}% - 10px)`;
+        
+        if(this.progress === 1) {
+          callback();
+        }
+        
+      }).catch(() => {
+        console.log("Some error occured!")
+      })
+      
+    }
+    
+  }
+  
+  loadImg(url) {
+    return new Promise((resolve, reject) => {
+      let img = new Image();
+      img.src = url;
+      img.onload = () => {
+        resolve(img);
+      }
+      img.onerror = () => {
+        reject();
+      }
+    })
+  }
+  
+  loadJSON(url) {
+    return new Promise((resolve, reject) => {
+      let request = fetch(url);
+      request.then(response => {
+        resolve(response.json());
+      }).catch(() => {
+        reject();
+      })
+    })
+  }
+  
+  loadAudio(url) {
+    return new Promise((resolve, reject) => {
+      let audio = new Audio();
+      audio.src = url;
+      audio.oncanplay = () => {
+        resolve(audio);
+      }
+      audio.onerror = () => {
+        reject();
+      }
+    })
+  }
+  
+  get(name) {
+    return this.assets.get(name);
+  }
+  
+}
+
+class Vector {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+  
+  add(vec) {
+    this.x += vec.x;
+    this.y += vec.y;
+    return this;
+  }
+  
+  sub(vec) {
+    this.x -= vec.x;
+    this.y -= vec.y;
+    return this;
+  }
+  
+  mult(k) {
+    this.x *= k;
+    this.y *= k;
+    return this;
+  }
+  
+  set(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+  
+  mag() {
+    return Math.hypot(this.x, this.y);
+  }
+  
+  copy() {
+    return new Vector(this.x, this.y);
+  }
+  
+  unit() {
+    return this.copy().mult(1 / this.mag());
+  }
+  
+  lerp(v, k) {
+ let t = this.copy()
+ let tar = v.copy()
+    return t.add(tar.sub(t).mult(k))
+  }
+  
+  
+}
+
+
+
+</script>
+
+<script>
+  
+let canvas1 = document.getElementById("canvas1");
+let ctx1 = canvas1.getContext("2d");
+canvas1.width = 300;
+canvas1.height = 140;
+ctx1.fillStyle = "rgb(28,69,89)";
+ctx1.fillRect(0, 0, canvas1.width, canvas1.height);
+
+let canvas2 = createCanvas(300, 140);
+document.getElementById("canvas2").append(canvas2);
+let ctx2 = canvas2.getContext("2d");
+
+function drawStar(ctx) {
+  ctx.fillStyle = "rgb(8,35,48)";
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.beginPath();
+  ctx.strokeStyle = "rgb(223,244,255)";
+  const R = 60;
+  const r = 30;
+  let [cx, cy] = [ctx.canvas.clientWidth / 2, ctx.canvas.clientHeight / 2];
+
+  ctx.moveTo(R + cx, cy);
+  for (let i = 1; i < 11; i++) {
+    const angle = (Math.PI / 5) * i;
+    const radius = (i % 2 === 0) ? R : r;
+
+    const x = radius * Math.cos(angle);
+    const y = radius * Math.sin(angle);
+
+    ctx.lineTo(x + cx, y + cy);
+  }
+
+  ctx.stroke();
+  ctx.closePath();
+}
+
+drawStar(ctx1);
+drawStar(ctx2);
+
+
+
+
+
+let loadBtn1 = document.getElementById("loadBtn1"),
+progressBar1 = document.getElementById("progressBar1");
+
+let assetLoader = new AssetLoader();
+loadBtn1.addEventListener("click", () => {
+  loadBtn1.style.display = "none";
+  progressBar1.style.display = "grid";
+  assetLoader.load({
+    "player": { url: "../Grotto%20Escape/assets/img/player.png", type: "Img" },
+    "tileset": { url: "../Grotto%20Escape/assets/img/infinity.png", type: "Img" },
+    "level": { url: "../Grotto%20Escape/assets/json/tilemap1.json", type: "JSON" },
+    "KimiNoMoji": { url:"https://files.catbox.moe/zzlofp.mp3", type: "Audio" }
+  
+  }, handleLoadedAsset);
+
+})
+
+function prettify(obj) {
+  let txt1 = "";
+  obj.data.forEach(row => {
+    txt1 += JSON.stringify(row)+",\n\t\t";
+  });
+  txt1 = txt1.slice(0, -4);
+  
+  let txt2= `{\n\t"data": [\n\t\t${txt1}\n\t]\n}`;
+  return txt2;
+}
+
+function handleLoadedAsset() {
+  progressBar1.style.display = "none";
+  
+  let assetsTestElm = document.getElementById("assets-test");
+  let knm = assetLoader.get("KimiNoMoji");
+  knm.controls = true;
+  assetsTestElm.append(knm);
+  
+  let canvas3 = createCanvas(300, 140);
+  let ctx3 = canvas3.getContext("2d");
+  let tileset = assetLoader.get("tileset");
+  ctx3.drawImage(tileset, 0, 0, tileset.width, tileset.height, 20, 20, 260, 260 * tileset.height / tileset.width);
+  assetsTestElm.append(canvas3);
+  
+  let note = document.createElement("div");
+  note.classList.add("sidenote");
+  note.innerHTML += `<div class="sidenote">An 11×5 tileset (we're going to use it later)</div>`;
+  assetsTestElm.append(note);
+  
+  let pre = document.createElement("pre");
+  let code = document.createElement("code");
+  code.classList.add("language-javascript");
+  code.innerHTML = "// It's a 50×50 (rows×columns) 2d array (2d because map array contains arrays that represent each row of the tilemap) Here each number represent a tile from tileset. For example 16 represent the lava tile (full orange)\n//We are going to use it in tilemap section\n"+prettify(assetLoader.get("level"));
+  
+  pre.append(code);
+  Prism.highlightElement(code);
+  assetsTestElm.append(pre);
+  
+  
+  
+  
+  
+}
+
+
+
+let loader = new AssetLoader();
+let assetToLoad = {
+  "tileset": { url: "../Grotto%20Escape/assets/img/infinity.png", type: "Img"},
+  "level": { url: "../Grotto%20Escape/assets/json/tilemap1.json", type: "JSON" }
+};
+loader.load(assetToLoad, main1);
+
+function main1() {
+  canvas4 = createCanvas(320, 180);
+  //canvas4.style.marginBottom = "100px";
+  canvas4.style.border = "1px solid rgb(4,29,59)";
+  ctx4 = canvas4.getContext("2d");
+  
+  document.getElementById("canvas4").append(canvas4);
+  
+  
+  now = then = frameThen = performance.now();
+  frames = 0;
+  fps = 0;
+  dt = 0;
+  
+  loop1();
+  
+  
+  main2();
+}
+
+function drawText(ctx, text, x = 0, y = 0, size = 12, fontFamily = "Sans-serif") {
+  ctx.font = `${size}px ${fontFamily}`;
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.fillText(text, x, y);
+}
+
+function loop1() {
+  requestAnimationFrame(loop1);
+  ctx4.clearRect(0, 0, canvas4.width, canvas4.height);
+  
+  now = performance.now();
+  dt = (now - then) / 1000;
+  if(now - frameThen > 1000) {
+    fps = frames;
+    frames = 0;
+    frameThen = now;
+  } else {
+    frames += 1;
+  }
+  then = now;
+  
+  
+  drawText(ctx4, `FPS: ${fps}`, 30, 20);
+  
+  
+
+  
+}
+
+
+function main2() {
+  canvas5 = createCanvas(320, 180);
+  //canvas4.style.marginBottom = "100px";
+  canvas5.style.border = "1px solid rgb(4,29,59)";
+  ctx5 = canvas5.getContext("2d");
+  
+  document.getElementById("canvas5").append(canvas5);
+  
+  
+  now2 = then2 = frameThen2 = performance.now();
+  frames2 = 0;
+  fps2 = 0;
+  dt2 = 0;
+  
+  
+  tilemap = new Tilemap(loader.get("tileset"), [11, 5], loader.get("level").data);
+
+  tilemap.init();
+  
+  cam = {
+    zoom: 1,
+    pos: new Vector(90, 90)
+  };
+  dpr = window.devicePixelRatio || 1;
+  offsetX = canvas5.clientWidth / 2;
+  offsetY = canvas5.clientHeight / 2;
+  
+  target = {pos: new Vector(160, 90)}
+  setInterval(() => {
+    target.pos = new Vector(Math.random()*tilemap.data[0].length*tilemap.tilesize, Math.random()*tilemap.data.length*tilemap.tilesize);
+  }, 4000);
+  
+  loop2();
+}
+
+function applyCamera(ctx) {
+  ctx.setTransform(
+    dpr * cam.zoom,
+    0,
+    0,
+    dpr * cam.zoom,
+    Math.round(dpr * (offsetX - cam.pos.x * cam.zoom)),
+    Math.round(dpr * (offsetY - cam.pos.y * cam.zoom))
+  );
+}
+
+class Tilemap {
+  constructor(tileset, tilesetDim, data, tilesize = 16, chunkSize = 16) {
+    this.tileset = tileset;
+    this.tilesetDim = tilesetDim;
+    this.data = data;
+    this.tilesize = tilesize;
+    this.chunks = new Map();
+    this.chunkSize = chunkSize;
+    this.cx_max = Math.ceil(this.data[0].length / this.chunkSize);
+    this.cy_max = Math.ceil(this.data.length / this.chunkSize);
+    
+  }
+  
+  init() {
+    
+    let rows = this.data.length;
+    let columns = this.data[0].length;
+    
+    let sw = this.tileset.width / this.tilesetDim[0];
+    let sh = this.tileset.height / this.tilesetDim[1];
+    
+    
+    this.data.forEach((row, rIdx) => {
+      row.forEach((tile, cIdx) => {
+        
+        let chunk_y = Math.floor(rIdx / this.chunkSize);
+        if(!this.chunks.has(chunk_y)) this.chunks.set(chunk_y, new Map());
+        
+        let chunk_x = Math.floor(cIdx / this.chunkSize);
+        if(!this.chunks.get(chunk_y).has(chunk_x)) {
+          let offcanvas = document.createElement("canvas");
+          offcanvas.width = offcanvas.height = this.chunkSize * this.tilesize;
+          
+          this.chunks.get(chunk_y).set(chunk_x, offcanvas);
+        }
+        
+        let chunk_canvas = this.chunks.get(chunk_y).get(chunk_x);
+        let ctx = chunk_canvas.getContext("2d");
+        
+        
+        
+        let sx = ((tile - 1) % this.tilesetDim[0]) * sw;
+        let sy = Math.floor((tile - 1) / this.tilesetDim[0]) * sh;
+        
+        let dx = (cIdx % this.chunkSize) * this.tilesize;
+        let dy = (rIdx % this.chunkSize) * this.tilesize;
+        
+        ctx.drawImage(this.tileset, sx, sy, sw, sh, dx, dy, this.tilesize, this.tilesize);
+        
+        
+      })
+    })
+    
+  }
+  
+  render(ctx) {
+    
+    for(let cy = 0; cy < this.cy_max; cy++) {
+      for(let cx = 0; cx < this.cx_max; cx++) {
+        let chunk = this.chunks.get(cy).get(cx);
+        ctx.drawImage(chunk, 0, 0, chunk.width, chunk.height, cx * chunk.width, cy * chunk.height, chunk.width, chunk.height);
+        
+      }
+    }
+    
+  }
+  
+}
+
+function loop2() {
+  requestAnimationFrame(loop2);
+  ctx5.clearRect(0, 0, canvas5.width, canvas5.height);
+  
+  now2 = performance.now();
+  dt2 = (now2 - then2) / 1000;
+  if(now2 - frameThen2 > 1000) {
+    fps2 = frames2;
+    frames2 = 0;
+    frameThen2 = now2;
+  } else {
+    frames2 += 1;
+  }
+  then2 = now2;
+  
+  
+  
+  
+  
+  cam.pos = cam.pos.lerp(target.pos, 0.05);
+  
+  applyCamera(ctx5);
+  tilemap.render(ctx5);
+  ctx5.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawText(ctx5, `FPS: ${fps2}`, 30, 20);
+  
+}
+
+
+
+
+
+</script>
+
+</body>
+</html>
