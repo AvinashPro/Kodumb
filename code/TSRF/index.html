@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Tupper's self-referential formula</title>
+  <style>
+:root {
+  --primary-color: #9ffff1;
+  --secondary-color: #d7efec;
+}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  background: rgb(0,10,20);
+}
+canvas {
+  margin: auto;
+  image-rendering: pixelated;
+  margin-top: 20px;
+}
+canvas#draw {
+  touch-action: none;
+  margin-top: 0;
+  background-image: 
+    linear-gradient(to right, #e7fffc50 0.1px, transparent 0.5px),
+    linear-gradient(to bottom, #e7fffc50 0.1px, transparent 0.5px);
+  background-size: 
+    calc(100% / 106) 
+    calc(100% / 17);
+}
+p {
+  font-size: 6px;
+  color: var(--secondary-color);
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  margin-top: 10px;
+}
+.container {
+  width: 100vw;
+  margin: auto;
+  padding: 20px;
+}
+h3 {
+  color: var(--primary-color);
+}
+h4, label {
+  color: var(--secondary-color);
+}
+button {
+  padding: 8px;
+  border-radius: 8px;
+  background: #bdf2ff; /* #67e1ff */
+  color: #006781;
+  font-weight: 700;
+  outline: none;
+  border: none;
+  transition: 0.3s;
+  user-select: none;
+}
+button:hover {
+  background: #33d7ff;
+}
+input {
+  margin: 5px 0;
+}
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h3 id="heading">Tupper's Self-Referential Formula</h3>
+  <canvas></canvas>
+  
+  <h4 style="margin-top:50px;">Draw</h4>
+  <canvas id="draw"></canvas>
+  
+  <div>
+    <input type="checkbox" id="eraser">
+    <label for="eraser">Eraser</label>
+  </div>
+  <div>
+    <input type="checkbox" id="showK">
+    <label for="showK">Show K</label>
+  </div>
+  <button id="loadK">Load K</button>
+  <button id="copyK">Copy</button>
+  
+  
+  <p style="display:none;"></p>
+</div>
+
+<script>
+
+document.querySelector("#heading").addEventListener("dblclick", () => {
+  document.documentElement.requestFullscreen();
+})
+
+const canvas = document.querySelector("canvas");
+canvas.width = 106 * 3;
+canvas.height = 17 * 3;
+const ctx = canvas.getContext("2d");
+
+const canvas2 = document.querySelector("#draw");
+const ctx2 = canvas2.getContext("2d");
+canvas2.width = Math.floor(window.innerWidth / 106) * 106;
+canvas2.height = canvas2.width / 106 * 17;
+let canvas2Rect = canvas2.getBoundingClientRect();
+const observer = new ResizeObserver(() => {
+  canvas2Rect = canvas2.getBoundingClientRect();
+});
+observer.observe(canvas2);
+
+
+function TSRF(x, y) {
+  x = BigInt(x);
+  y = BigInt(y);
+  return (((y / 17n) >> (17n * x + (y % 17n))) & 1n) === 1n;
+}
+
+
+function TSRFDraw(ctx, k, pixelSize) {
+  if(!pixelSize) pixelSize = Math.round(ctx.canvas.height / 17);
+  
+  for(let c = 0; c < 106; c++) {
+    for(let r = 0; r < 17; r++) {
+      if(TSRF(c, BigInt(r) + BigInt(k))) {
+        ctx.fillStyle = "#1affe9";
+        ctx.fillRect((105 - c) * pixelSize, r * pixelSize, pixelSize, pixelSize);
+      }
+    }
+  }
+  
+  canvas.addEventListener("dblclick", () => {
+    navigator.clipboard.writeText(k);
+  })
+  
+}
+
+
+const params = new URLSearchParams(window.location.search);
+let qK = params.get("k");
+
+TSRFDraw(ctx, qK ? BigInt(qK) : 960939379918958884971672962127852754715004339660129306651505519271702802395266424689642842174350718121267153782770623355993237280874144307891325963941337723487857735749823926629715517173716995165232890538221612403238855866184013235585136048828693337902491454229288667081096184496091705183454067827731551705405381627380967602565625016981482083418783163849115590225610003652351370343874461848378737238198224849863465033159410054974700593138339226497249461751545728366702369745461014655997933798537483143786841806593422227898388722980000748404719n);
+
+/*
+function drawGrid(ctx, cols, rows, cellSize) {
+  ctx.strokeStyle = "#dcfffa";
+  ctx.lineWidth = 0.1;
+  ctx.beginPath();
+  
+  for (let c = 0; c <= cols; c++) {
+    const x = c * cellSize + 0.5;
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, rows * cellSize);
+  }
+
+  for (let r = 0; r <= rows; r++) {
+    const y = r * cellSize + 0.5;
+    ctx.moveTo(0, y);
+    ctx.lineTo(cols * cellSize, y);
+  }
+
+  ctx.stroke();
+}
+
+drawGrid(ctx2, 106, 17, canvas2.height / 17);
+*/
+
+const bitmap = new Array(17);
+for(let i = 0; i < bitmap.length; i++) {
+  bitmap[i] = new Uint8Array(106);
+}
+
+
+const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
+
+const elms = {
+  p: document.querySelector("p"),
+  showK: document.querySelector("#showK"),
+  eraser: document.querySelector("#eraser"),
+  loadK: document.querySelector("#loadK"),
+  copyK: document.querySelector("#copyK")
+};
+
+elms.showK.addEventListener("click", () => {
+  elms.p.style.display = elms.showK.checked ? "block" : "none";
+  if(elms.showK.checked && elms.p.textContent === "") elms.p.textContent = bitmapToK(bitmap);
+})
+
+
+
+elms.copyK.addEventListener("click", () => {
+  navigator.clipboard.writeText(bitmapToK(bitmap))
+    .then(() => {
+      return true;
+    })
+    .catch(err => {
+      console.error('(TSRF) Failed to copy the value of k!');
+    });
+})
+
+elms.loadK.addEventListener("click", () => {
+  let k = window.prompt("Please enter a value of K!");
+  if(k === null || k === "" || isNaN(k)) return;
+  
+  k = BigInt(k);
+  const binaryString = (k / 17n).toString(2).padStart(1802, "0");
+  
+  let currentColumn = 0, currentRow = 16;
+  for(let i = 0; i < binaryString.length; i++) {
+    const bit = parseInt(binaryString[i]);
+    bitmap[currentRow][currentColumn] = bit;
+    currentRow--;
+    if(currentRow < 0) {
+      currentRow = 16;
+      currentColumn++;
+    }
+  }
+  
+  completeDraw();
+  
+  elms.p.textContent = bitmapToK(bitmap);
+  
+})
+
+const pixelSize = canvas2.height / 17;
+
+function drawPixels(e) {
+  const c = Math.floor(clamp(e.clientX - canvas2Rect.left, 0, canvas2.width - 1) / pixelSize);
+  const r = Math.floor(clamp(e.clientY - canvas2Rect.top, 0, canvas2.height - 1) / pixelSize);
+  
+  const isErasing = elms.eraser.checked;
+  
+  bitmap[r][c] = isErasing ? 0 : 1;
+  if(elms.showK.checked) elms.p.textContent = bitmapToK(bitmap);
+  
+  if(!isErasing) {
+    ctx2.fillStyle = "#defefa";
+    ctx2.fillRect(c * pixelSize, r * pixelSize, pixelSize, pixelSize);
+  } else {
+    ctx2.clearRect(c * pixelSize, r * pixelSize, pixelSize, pixelSize);
+  }
+  
+}
+
+let isDragging = false;
+canvas2.addEventListener("pointerdown", e => {
+  isDragging = true;
+  drawPixels(e);
+});
+canvas2.addEventListener("pointermove", e => {
+  if(!isDragging) return;
+  drawPixels(e);
+});
+canvas2.addEventListener("pointerup", () => {
+  isDragging = false;
+})
+
+
+
+function bitmapToK(bitmap) {
+  let binaryString = "";
+  for(let c = 0; c < bitmap[0].length; c++) {
+    for(let r = bitmap.length - 1; r >= 0; r--) {
+      binaryString += bitmap[r][c];
+    }
+  }
+  
+  return (BigInt(`0b${binaryString}`) * 17n).toString();
+}
+
+function completeDraw() {
+  ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+  for(let c = 0; c < 106; c++) {
+    for(let r = 0; r < 17; r++) {
+      const bit = bitmap[r][c];
+      if(bit === 1) {
+        ctx2.fillStyle = "#defefa";
+        ctx2.fillRect(c * pixelSize, r * pixelSize, pixelSize, pixelSize);
+      }
+    }
+  }
+}
+
+
+window.addEventListener("scrollend", () => {
+  canvas2Rect = canvas2.getBoundingClientRect();
+})
+
+
+</script>
+
+
+</body>
+</html>

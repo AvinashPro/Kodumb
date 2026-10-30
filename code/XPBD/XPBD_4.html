@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      background: rgb(0, 10, 20);
+      display: grid;
+      place-items: center;
+    }
+    canvas {
+      border: 2px solid #09f2;
+      width: 360px;
+      height: 420px;
+    }
+    #fps {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: rgb(174,220,255);
+    }
+  </style>
+</head>
+<body>
+  <div id="fps"></div>
+  <canvas></canvas>
+<script>
+const fpsElm = document.querySelector("#fps");
+
+class Time {
+  t0 = 0;
+  t1 = 0;
+  t;
+  dt;
+  fps;
+  frames = 0;
+  constructor() { }
+  update(t) {
+    this.t = t;
+    this.dt = (this.t - this.t0) * 0.001;
+    this.t0 = this.t;
+    
+    this.t1 += this.dt;
+    this.frames++;
+    if(this.t1 >= 1) {
+      this.t1 = 0;
+      this.fps = this.frames;
+      fpsElm.textContent = this.fps;
+      this.frames = 0;
+    }
+    
+  }
+  
+}
+class vec2 {
+  static count = 0;
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+    vec2.count++;
+  }
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+  }
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+  }
+  scale(k) {
+    this.x *= k;
+    this.y *= k;
+    return this;
+  }
+  addScaled(v, t) {
+    this.x += v.x * t;
+    this.y += v.y * t;
+    return this;
+  }
+  clone() {
+    return new vec2(this.x, this.y);
+  }
+  static from(v) {
+    return new vec2(v.x, v.y);
+  }
+  copy(v) {
+    this.x = v.x;
+    this.y = v.y;
+    return this;
+  }
+  set(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+  dot(v) {
+    return this.x * v.x + this.y * v.y;
+  }
+  cross(v) {
+    return this.x * v.y - v.x * this.y;
+  }
+  rotate(angle, v = this) {
+    const sin = Math.sin(angle);
+    const cos = Math.cos(angle);
+    const { x, y } = this;
+    v.x = x * cos - y * sin;
+    v.y = x * sin + y * cos;
+    return v;
+  }
+  rotate2(sin, cos, v = this) {
+    const { x, y } = this;
+    v.x = x * cos - y * sin;
+    v.y = x * sin + y * cos;
+    return v;
+  }
+  lengthSq() {
+    return this.x * this.x + this.y * this.y;
+  }
+  length() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  }
+  normalize() {
+    const len = this.length();
+    if(len !== 0) return this.scale(1 / len);
+    return this.set(1, 0);
+  }
+  lerp(v, t = 0.05) {
+    this.x += (v.x - this.x) * t;
+    this.y += (v.y - this.y) * t;
+    return this;
+  }
+}
+
+
+class Body {
+  constructor(params = {}) {
+    this.pos = new vec2(params.x ?? 0, params.y ?? 0);
+    this.predicted = new vec2();
+    this.vel = new vec2();
+    const mass = params.mass ?? 1;
+    this.invMass = mass ? 1 / mass : 0;
+    this.color = params.color || "#09f";
+  }
+  
+  
+  render(ctx) {}
+  update(dt) {}
+  
+}
+
+
+class Point extends Body {
+  constructor(params = {}) {
+    super(params);
+    this.r = params.r ?? 5;
+  }
+  
+  render(ctx) {
+    ctx.beginPath();
+    ctx.fillStyle = this.color;
+    ctx.arc(this.pos.x, this.pos.y, this.r, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+  
+}
+
+class DistanceConstraint {
+  constructor(a, b, restLength, compliance) {
+    this.a = a;
+    this.b = b;
+    this.restLength = restLength;
+    this.compliance = compliance;
+    this.lambda = 0;
+  }
+  
+  solve(dt) {
+    const { a, b } = this;
+    const dx = b.predicted.x - a.predicted.x;
+    const dy = b.predicted.y - a.predicted.y;
+    const distance = Math.hypot(dx, dy);
+    if(distance < 1e-8) return;
+    
+    const nx = dx / distance;
+    const ny = dy / distance;
+    
+    const C = distance - this.restLength;
+    const w1 = a.invMass;
+    const w2 = b.invMass;
+    const alpha = this.compliance / (dt * dt);
+    const denominator = w1 + w2 + alpha;
+    
+    const deltaLambda = (- C - alpha * this.lambda) / denominator;
+    this.lambda += deltaLambda;
+    
+    a.predicted.x -= w1 * deltaLambda * nx;
+    a.predicted.y -= w1 * deltaLambda * ny;
+    
+    b.predicted.x += w2 * deltaLambda * nx;
+    b.predicted.y += w2 * deltaLambda * ny;
+    
+  }
+  
+  render(ctx) {
+    ctx.beginPath();
+    ctx.strokeStyle = "#fff";
+    ctx.moveTo(this.a.pos.x, this.a.pos.y);
+    ctx.lineTo(this.b.pos.x, this.b.pos.y);
+    ctx.stroke();
+  }
+  
+}
+
+
+class ContactConstraint {
+  constructor(a, b, compliance) {
+    this.a = a;
+    this.b = b;
+    this.compliance = compliance;
+    this.lambda = 0;
+  }
+  
+  solve(dt) {
+    const { a, b } = this;
+    const dx = b.predicted.x - a.predicted.x;
+    const dy = b.predicted.y - a.predicted.y;
+    const distance = Math.hypot(dx, dy);
+    if(distance < 1e-8) return;
+    
+    const nx = dx / distance;
+    const ny = dy / distance;
+    
+    const C = distance - a.r - b.r;
+    if(C >= 0) return;
+    
+    const w1 = a.invMass;
+    const w2 = b.invMass;
+    if(w1 + w2 === 0) return;
+    
+    const alpha = this.compliance / (dt * dt);
+    const denominator = w1 + w2 + alpha;
+    
+    let deltaLambda = (- C - alpha * this.lambda) / denominator;
+    const newLambda = Math.max(0, deltaLambda + this.lambda);
+    deltaLambda = newLambda - this.lambda;
+    this.lambda = newLambda;
+    
+    a.predicted.x -= w1 * deltaLambda * nx;
+    a.predicted.y -= w1 * deltaLambda * ny;
+    b.predicted.x += w2 * deltaLambda * nx;
+    b.predicted.y += w2 * deltaLambda * ny;
+    
+  }
+  
+  render(ctx) {
+    ctx.beginPath();
+    ctx.strokeStyle = "rgb(164,206,239)";
+    ctx.moveTo(0, this.floorY);
+    ctx.lineTo(canvas.width, this.floorY);
+    ctx.stroke();
+  }
+  
+}
+
+
+
+class Solver {
+  constructor(entities, constraints, params = {}) {
+    this.iterations = params.iterations ?? 8;
+    this.constraints = constraints;
+    this.entities = entities;
+  }
+  
+  
+  
+  step(dt) {
+    // reset value of lagrange multiplier
+    for(const c of this.constraints) c.lambda = 0;
+    
+    // apply gravity and calculate predicted position
+    for(const e of this.entities) {
+      if(e.invMass !== 0) {
+        e.vel.x += g.x * dt;
+        e.vel.y += g.y * dt;
+      }
+      e.predicted.x = e.pos.x + e.vel.x * dt;
+      e.predicted.y = e.pos.y + e.vel.y * dt;
+    }
+    
+    // solve constraints
+    for(let iter = 0; iter < this.iterations; iter++) {
+      for(const c of this.constraints) c.solve(dt);
+    }
+    
+    // correct velocity and update position
+    for(const e of this.entities) {
+      e.vel.x = (e.predicted.x - e.pos.x) / dt;
+      e.vel.y = (e.predicted.y - e.pos.y) / dt;
+      
+      //if(e.predicted.y + e.r >= floorY && e.vel.y > 0) e.vel.y *= - restitution;
+      
+      e.pos.copy(e.predicted);
+    }
+    
+    
+  }
+  
+}
+
+
+const canvas = document.querySelector("canvas");
+const dpr = window.devicePixelRatio || 1;
+canvas.width = Math.floor(canvas.clientWidth * dpr);
+canvas.height = Math.floor(canvas.clientHeight * dpr);
+const ctx = canvas.getContext("2d");
+ctx.scale(dpr, dpr);
+
+
+const g = new vec2(0, 200);
+//const restitution = 0.5;
+//const floorY = 300;
+const entities = [];
+const constraints = [];
+
+let x0 = canvas.clientWidth/2, y0 = canvas.clientHeight/2 - 100, L = 20;
+const floor = new Point({ x: x0, y: y0*31, mass: 0, r: 3000, color: "rgb(208,233,253,0.1)" });
+const p1 = new Point({ x: x0/2 - L, y: y0 - L + L, r: 5, mass: 1 });
+const p2 = new Point({ x: x0/2 - L + L, y: y0 + L, r: 5, mass: 1 });
+const p3 = new Point({ x: x0/2 + L, y: y0 + L - L, r: 5, mass: 1 });
+const p4 = new Point({ x: x0/2 + L - L, y: y0 - L, r: 5, mass: 1 });
+
+let prev;
+for(let i = 0; i < 30; i++) {
+  const p = new Point({ x: x0, y: i*30 - 600 });
+  entities.push(p);
+  constraints.push(new ContactConstraint(p, floor, 0));
+  if(prev) constraints.push(new ContactConstraint(prev, p, 0));
+  prev = p;
+}
+
+prev = null;
+for(let i = 0; i < 30; i++) {
+  const p = new Point({ x: x0*1.5 + Math.random() - 0.5, y: i*10+10, r: 2, color: "#fff"});
+  entities.push(p);
+  constraints.push(new ContactConstraint(p, floor, 0));
+  if(prev) {
+    constraints.push(new DistanceConstraint(prev, p, 11, 0));
+  } else {
+    p.invMass = 0
+  }
+  prev = p;
+}
+
+
+
+entities.push(floor, p1, p2, p3, p4);
+constraints.push(
+  new ContactConstraint(p1, floor, 0.001),
+  new ContactConstraint(p2, floor, 0.001),
+  new ContactConstraint(p3, floor, 0.001),
+  new ContactConstraint(p4, floor, 0.001),
+  
+  new DistanceConstraint(p1, p2, 2*L, 0.01),
+  new DistanceConstraint(p2, p3, 2*L, 0.01),
+  new DistanceConstraint(p3, p4, 2*L, 0.01),
+  new DistanceConstraint(p4, p1, 2*L, 0.01),
+  new DistanceConstraint(p1, p3, 2*L*Math.sqrt(2), 0.01),
+  new DistanceConstraint(p2, p4, 2*L*Math.sqrt(2), 0.01)
+)
+
+
+
+const solver = new Solver(entities, constraints, { iterations: 8 });
+const time = new Time();
+
+
+
+
+const tick = (t) => {
+  requestAnimationFrame(tick);
+  time.update(t);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  
+  solver.step(time.dt);
+  
+  for(const c of constraints) c.render(ctx);
+  for(const e of entities) e.render(ctx);
+  
+  
+}
+
+time.t0 = performance.now();
+time.t1 = performance.now();
+requestAnimationFrame(tick);
+
+
+</script>
+</body>
+</html>

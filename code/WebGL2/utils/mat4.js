@@ -88,7 +88,7 @@ class Mat4 {
     }
     return this;
   }
-  
+  // sign error in rotateX but Y and Z are correct
   rotateX(angle) {
     const d = this.data;
     const d1 = d[1], d5 = d[5], d9 = d[9], d13 = d[13];

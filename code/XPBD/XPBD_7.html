@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html, body {
+  height: 100vh;
+  width: 100vw;
+  display: grid;
+  place-items: center;
+  background-color: rgb(0, 10, 20);
+}
+canvas {
+  width: 360px;
+  height: 480px;
+  border: 1px solid rgba(167,215,253,0.5);
+  touch-action: none; /* IMPORTANT: FPS DROP */
+}
+#fpsElm {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: rgb(152,209,254);
+}
+  </style>
+</head>
+<body>
+
+<div id="fpsElm"></div>
+<canvas></canvas>
+
+<script>
+const CONFIG = {
+  GRAVITY: [0, 1]
+};
+
+
+class vec2 {
+  static count = 0;
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+    vec2.count++;
+  }
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+  }
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+  }
+  scale(k) {
+    this.x *= k;
+    this.y *= k;
+    return this;
+  }
+  addScaled(v, t) {
+    this.x += v.x * t;
+    this.y += v.y * t;
+    return this;
+  }
+  clone() {
+    return new vec2(this.x, this.y);
+  }
+  static from(v) {
+    return new vec2(v.x, v.y);
+  }
+  copy(v) {
+    this.x = v.x;
+    this.y = v.y;
+    return this;
+  }
+  set(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+  dot(v) {
+    return this.x * v.x + this.y * v.y;
+  }
+  cross(v) {
+    return this.x * v.y - v.x * this.y;
+  }
+  rotate(angle, v = this) {
+    const sin = Math.sin(angle);
+    const cos = Math.cos(angle);
+    const { x, y } = this;
+    v.x = x * cos - y * sin;
+    v.y = x * sin + y * cos;
+    return v;
+  }
+  rotate2(sin, cos, v = this) {
+    const { x, y } = this;
+    v.x = x * cos - y * sin;
+    v.y = x * sin + y * cos;
+    return v;
+  }
+  lengthSq() {
+    return this.x * this.x + this.y * this.y;
+  }
+  length() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  }
+  normalize() {
+    const len = this.length();
+    if(len !== 0) return this.scale(1 / len);
+    return this.set(1, 0);
+  }
+  lerp(v, t = 0.05) {
+    this.x += (v.x - this.x) * t;
+    this.y += (v.y - this.y) * t;
+    return this;
+  }
+}
+class Time {
+  t0 = 0;
+  t1 = 0;
+  t;
+  dt;
+  fps;
+  frames = 0;
+  fpsElm = document.querySelector("#fpsElm");
+  constructor() { }
+  update(t) {
+    this.t = t;
+    this.dt = (this.t - this.t0) * 0.001;
+    this.t0 = this.t;
+    
+    this.t1 += this.dt;
+    this.frames++;
+    if(this.t1 >= 1) {
+      this.t1 = 0;
+      this.fps = this.frames;
+      this.fpsElm.textContent = this.fps;
+      this.frames = 0;
+    }
+    
+  }
+  
+}
+class Body {
+  static CIRCLE = 1 << 0;
+  static CONVEX_POLYGON = 1 << 1;
+  constructor(params) {
+    this.id = ++Body._id;
+    const mass = params.mass ?? 1;
+    this.invMass = mass > 0 ? 1 / mass : 0;
+    const mInertia = params.mInertia ?? 100;
+    this.invInertia = mInertia > 0 ? 1 / mInertia : 0;
+    this.vel = new vec2(params.vx ?? 0, params.vy ?? 0);
+    this.pos = new vec2(params.x ?? 0, params.y ?? 0);
+    this.predicted = vec2.from(this.pos);
+    this.shape = null;
+    this.angle = params.angle ?? 0;
+    this.aabb = [];
+    this.angVel = params.angVel ?? 0;
+  }
+  render() {}
+  update(dt) {
+    this.angle += this.angVel * dt;
+    this.sin = Math.sin(this.angle);
+    this.cos = Math.cos(this.angle);
+  }
+}
+
+class Circle extends Body {
+  constructor(params = {}) {
+    super(params);
+    this.r = params.r ?? 10;
+    this.shape = Body.CIRCLE;
+  }
+  
+  computeAABB() {
+    this.aabb[0] = this.pos.x - this.r;
+    this.aabb[1] = this.pos.x + this.r;
+    this.aabb[2] = this.pos.y - this.r;
+    this.aabb[3] = this.pos.y + this.r;
+  }
+  
+}
+class Polygon extends Body {
+  constructor(vertices, params = {}) {
+    super(params);
+    this.vertices = vertices;
+    this.worldVertices = [];
+    for(let i = 0; i < this.vertices.length; i++) {
+      this.worldVertices.push(vec2.from(this.vertices[i]));
+    };
+    this.shape = Body.CONVEX_POLYGON;
+  }
+  
+  computeWorldVertices() {
+    for(let idx = 0; idx < this.worldVertices.length; idx++) {
+      this.vertices[idx].rotate2(this.sin, this.cos, this.worldVertices[idx]).add(this.pos);
+    }
+    return this.worldVertices;
+  }
+  
+  computeAABB() {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for(let i = 0; i < this.worldVertices.length; i++) {
+      const v = this.worldVertices[i];
+      minX = Math.min(v.x, minX);
+      minY = Math.min(v.y, minY);
+      maxX = Math.max(v.x, maxX);
+      maxY = Math.max(v.y, maxY);
+    }
+    this.aabb[0] = minX;
+    this.aabb[1] = maxX;
+    this.aabb[2] = minY;
+    this.aabb[3] = maxY;
+  }
+  
+}
+
+class Solver {
+  constructor(bodies, constraints, { iterations = 10 } = {}) {
+    this.bodies = bodies;
+    this.constraints = constraints;
+    this.iterations = iterations;
+  }
+  
+  step(dt) {
+    // Reset Lagrange Multiplier 
+    for(const c of this.constraints) c.lambda = 0;
+    
+    // Apply gravity and Predict positions
+    for(const body of this.bodies) {
+      if(body.invMass !== 0) {
+        body.vel.x += CONFIG.GRAVITY[0] * dt;
+        body.vel.y += CONFIG.GRAVITY[1] * dt;
+      }
+      body.predicted.x = body.pos.x + body.vel.x * dt;
+      body.predicted.y = body.pos.y + body.vel.y * dt;
+    }
+    
+    
+    // solve constraints 
+    for(let i = 0; i < this.iterations; i++) {
+      for(const c of this.constraints) c.solve(dt);
+    }
+    
+    // reconstruct velocity 
+    for(const b of this.bodies) {
+      b.vel.x = (b.predicted.x - b.pos.x) / dt;
+      b.vel.y = (b.predicted.y - b.pos.y) / dt;
+    }
+    
+    // commit positions 
+    for(const b of this.bodies) {
+      b.pos.copy(b.predicted);
+    }
+    
+  }
+  
+}
+
+class Game {
+  _raf;
+  _running;
+  constructor(canvas, params = {}) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.bodies = [];
+    this.constraints = [];
+    this.solver = new Solver(this.bodies, this.constraints, { iterations: params.solverIterations ?? 8 });
+    this.time = new Time();
+    
+    this.DPR_SCALING_ENABLED = params.DPR_SCALING_ENABLED;
+    this._canvasResized = true;
+    this.observer = new ResizeObserver(() => { this._canvasResized = true; });
+    this.observer.observe(canvas);
+  }
+  
+  get dpr() { return this.DPR_SCALING_ENABLED ? (window.devicePixelRatio || 1) : 1; }
+  
+  _resizeCanvas() {
+    const dpr = this.dpr;
+    this.canvas.width = Math.floor(this.canvas.clientWidth * dpr);
+    this.canvas.height = Math.floor(this.canvas.clientHeight * dpr);
+    this.ctx.scale(dpr, dpr);
+  }
+  
+  render(ctx) {
+    
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    ctx.beginPath();
+    ctx.strokeStyle = "#af2";
+    for(const b of this.bodies) {
+      if(!(b.shape & Body.CIRCLE)) continue;
+      ctx.moveTo(b.pos.x + b.r, b.pos.y);
+      ctx.arc(b.pos.x, b.pos.y, b.r, 0, 2 * Math.PI);
+      ctx.moveTo(b.pos.x, b.pos.y);
+      ctx.lineTo(b.pos.x + b.r * b.cos, b.pos.y + b.r * b.sin);
+    }
+    ctx.stroke();
+    ctx.closePath();
+    
+    ctx.beginPath();
+    ctx.strokeStyle = "#09f";
+    for(const b of this.bodies) {
+      if(!(b.shape & Body.CONVEX_POLYGON)) continue;
+      ctx.moveTo(b.worldVertices[0].x, b.worldVertices[0].y);
+      for(let i = 0; i < b.worldVertices.length; i++) {
+        const v = b.worldVertices[(i + 1) % b.worldVertices.length];
+        ctx.lineTo(v.x, v.y);
+      }
+    }
+    ctx.stroke();
+    ctx.closePath();
+    
+  }
+  
+  update(dt) {
+    for(const b of this.bodies) {
+      b.update(dt);
+    }
+    this.solver.step(dt);
+    for(const b of this.bodies) {
+      if(b.shape & Body.CONVEX_POLYGON) b.computeWorldVertices();
+      b.computeAABB();
+    }
+  }
+  
+  tick = (t) => {
+    requestAnimationFrame(this.tick);
+    if(this._canvasResized) this._resizeCanvas();
+    this.time.update(t);
+    this.update(this.time.dt);
+    this.render(this.ctx);
+  }
+  
+  start() {
+    this._raf = requestAnimationFrame(this.tick);
+    this._running = true;
+  }
+  
+  stop() {
+    cancelAnimationFrame(this._raf);
+    this._raf = null;
+    this._running = false;
+  }
+  
+}
+
+
+const canvas = document.querySelector("canvas");
+const game = new Game(canvas, {
+  DPR_SCALING_ENABLED: true,
+  solverIterations: 8
+});
+
+
+game.bodies.push(
+  new Circle({ x: 100, y: 100 }),
+  new Circle({ x: 200, y: 150, angVel: -2, r: 30 }),
+  new Polygon([
+      new vec2(-40, -10),
+      new vec2(-40, 10),
+      new vec2(40, 10),
+      new vec2(40, -10)
+    ], { x: 200, y: 200, angle: 0, angVel: 1 })
+);
+
+
+function generateRegularPolyVertices(n, r = 30) {
+  const vertices = [];
+  const t = Math.PI * 2 / n;
+  for(let i = 0; i < n; i++) {
+    vertices.push(new vec2(Math.cos(i * t) * r, Math.sin(i * t) * r));
+  }
+  return vertices;
+}
+for(let i = 0; i < 100; i++) {
+  const x = Math.random() * (canvas.clientWidth - 50) + 25;
+  const y = Math.random() * (canvas.clientHeight - 50) + 25;
+  const r = (Math.random() * 20 + 5)*1;
+  const angVel = Math.random() * 6.28 - 3.14;
+  const mass = Math.floor(Math.random() * 10);
+  
+  const b = Math.random() > 0.5
+  ? new Polygon(generateRegularPolyVertices(Math.floor(Math.random() * (7-3)+3), r), { x, y, angVel, mass })
+  : new Circle({ x, y, r, angVel, mass });
+  game.bodies.push(b);
+  
+}
+
+
+game.start();
+
+
+</script>
+</body>
+</html>

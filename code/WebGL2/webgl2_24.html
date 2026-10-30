@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  background: rgb(0,10,20);
+  height: 100vh;
+  display: grid;
+  place-items: center;
+}
+canvas {
+  border: 1px solid #09f3;
+  width: 360px;
+  height: 480px;
+  touch-action: none;
+}
+#fpsElm {
+  color: #fff;
+  font-size: 12px;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-family: Sans-Serif;
+}
+  </style>
+</head>
+<body>
+  <div id="fpsElm"></div>
+  <canvas></canvas>
+<script type="module">
+import { Program } from "./utils/Program.js";
+import { Time } from "./utils/Time.js";
+import { InputManager } from "./utils/InputManager.js";
+import { Assets } from "./utils/Assets.js";
+
+const Geometry = (() => {
+  
+  function createQuad() {
+    const vertices = new Float32Array([
+      -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5
+    ]);
+    return { vertices };
+  }
+  
+  return {
+    createQuad
+  };
+  
+})();
+
+class Material {
+  constructor(program, { uniforms = {}, DEPTH_TEST_ENABLED = true } = {}) {
+    this.program = program;
+    this.uniforms = uniforms;
+    this.DEPTH_TEST_ENABLED = DEPTH_TEST_ENABLED;
+  }
+  
+  apply() {
+    const gl = this.program.gl;
+    gl.useProgram(this.program.handle);
+    this.DEPTH_TEST_ENABLED ? gl.enable(gl.DEPTH_TEST) : gl.disable(gl.DEPTH_TEST);
+    
+    for(const [uName, uValue] of Object.entries(this.uniforms)) {
+      const loc = this.program.uniform(uName);
+      if(!loc) continue;
+      this.applyUniform(loc, uValue);
+    }
+    
+  }
+  
+  applyUniform(uLoc, uValue) {
+    const gl = this.program.gl;
+    const handle = this.program.handle;
+    
+    if(uValue instanceof Float32Array || uValue instanceof Float64Array) {
+      switch(uValue.length) {
+        case 16:
+          gl.uniformMatrix4fv(uLoc, uValue);
+          break;
+        case 9:
+          gl.uniformMatrix3fv(uLoc, uValue);
+          break;
+        case 4:
+          gl.uniform4fv(uLoc, uValue);
+          break;
+      }
+    } else if(typeof uValue === "number") {
+      gl.uniform1f(uLoc, uValue);
+    }
+    
+  }
+  
+}
+
+class Mesh {
+  constructor(geometry, material) {
+    this.geometry = geometry;
+    this.material = material;
+  }
+}
+
+
+class Renderer {
+  
+  constructor(canvas) {
+    this.gl = canvas.getContext("webgl2");
+  }
+  
+  clear() {
+    const gl = this.gl;
+    gl.clearColor(0.0, 0.05, 0.3, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  }
+  
+  render() {
+   // this.clear();
+  }
+  
+}
+
+class App {
+  _raf;
+  _running;
+  _canvasResized = true;
+  _canvasScalingEnabled = true;
+  
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.renderer = new Renderer(canvas);
+    this.inputManager = new InputManager(canvas);
+    this.time = new Time();
+    this.res = new Assets();
+    
+    this.observer = new ResizeObserver(() => { this._canvasResized = true; });
+    this.observer.observe(canvas);
+  }
+  get dpr() { return this._canvasScalingEnabled ? (window.devicePixelRatio || 1) : 1; }
+  resizeCanvas() {
+    const dpr = this.dpr;
+    this.canvas.width = Math.floor(this.canvas.clientWidth * dpr);
+    this.canvas.height = Math.floor(this.canvas.clientHeight * dpr);
+    this.renderer.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    this._canvasResized = false;
+  }
+  
+  tick = (t) => {
+    this._raf = requestAnimationFrame(this.tick);
+    this.time.update(t);
+    if(this._canvasResized) this.resizeCanvas();
+    this.inputManager.update();
+    this.update(this.time.dt);
+    this.renderer.render();
+  }
+  
+  update(dt) {
+    
+  }
+  
+  async start({ res = []} = {}) {
+    await this.res.load(...res);
+    this._raf = requestAnimationFrame(this.tick);
+    this._running = true;
+  }
+  
+  stop() {
+    cancelAnimationFrame(this.raf);
+    this._running = false;
+  }
+  
+}
+
+const canvas = document.querySelector("canvas");
+const main = new App(canvas);
+
+function scene1(gl) {
+  const quad = Geometry.createQuad();
+  const program = new Program(gl, `#version 300 es
+    layout(location=0) in vec2 a_pos;
+    void main() {
+      gl_Position = vec4(a_pos, 0.0, 1.0);
+    }
+  `, `#version 300 es
+    precision mediump float;
+    uniform vec4 u_Color;
+    
+    out vec4 f_Color;
+    void main() {
+      f_Color = u_Color;
+    }
+  `);
+  const m1 = new Material(program, { DEPTH_TEST_ENABLED: false, uniforms: {
+    "u_Color": new Float32Array([0.1,0.9,1,1])
+  } });
+  m1.apply();
+  const mesh1 = new Mesh(quad, m1);
+  
+  gl.useProgram(program.handle);
+  
+  const vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, mesh1.geometry.vertices, gl.STATIC_DRAW);
+  
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  //gl.bindVertexArray(null);
+  gl.clearColor(0.0, 0.05, 0.1, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+  
+}
+
+main.start();
+setTimeout(() => {
+  
+scene1(main.renderer.gl);
+}, 500)
+
+
+</script>
+</body>
+</html>
