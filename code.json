@@ -1,7 +1,7 @@
 {
   "code": [
     { "name": "Tupper's self-referential formula", "src": "code/TSRF/index.html", "time": "30 October, 2026" },
-    { "name": "XPBD", "src": ["code/XPBD/XBPD_1.html", "code/XPBD/XBPD_2.html", "code/XPBD/XBPD_3.html", "code/XPBD/XBPD_4.html", "code/XPBD/XBPD_5.html", "code/XPBD/XBPD_6.html", "code/XPBD/XBPD_7.html"], "time": "6 October, 2026" },
+    { "name": "XPBD", "src": ["code/XPBD/XPBD_1.html", "code/XPBD/XPBD_2.html", "code/XPBD/XPBD_3.html", "code/XPBD/XPBD_4.html", "code/XPBD/XPBD_5.html", "code/XPBD/XPBD_6.html", "code/XPBD/XPBD_7.html"], "time": "6 October, 2026" },
     { "name": "Canvas Exporter", "src": "code/Canvas%20Exporter/demo.html", "time": "26 September, 2026" },
     { "name": "SVG", "src": "code/SVG/svg_1.html", "time": "21 September, 2026" },
     { "name": "Lalatina", "src": "code/Lalatina/lalatina.html", "time": "19 September, 2026" },
