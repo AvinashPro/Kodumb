@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Handler One</title>
+  <style>
+    * {
+      color: rgb(177,208,210);
+    }
+    body {
+      background: rgb(0,10,20);
+    }
+    input {
+      font-family: Arial, sans-serif;
+      color: #4b5563;
+      font-weight: 700;
+    }
+    input::file-selector-button {
+      margin-right: 16px;
+      border: none;
+      background: rgb(92,229,225);
+      padding: 10px 20px;
+      border-radius: 8px;
+      color: rgb(0,63,61);
+      cursor: pointer;
+      transition: background .2s ease-in-out;
+    }
+    input::file-selector-button:hover {
+      background: rgb(183,255,252);
+    }
+    h3 {
+      color: rgb(229,254,255);
+    }
+  </style>
+</head>
+<body>
+  
+  <section>
+    <h3>Compress PDF</h3>
+    <input type="file" id="pdf">
+  </section>
+  <section>
+    <h3>Remove Image Metadata PDF</h3>
+    <input type="file" id="metadata-img">
+  </section>
+  <section>
+    <h3>Compress Image</h3>
+    <input type="file" id="compress-img" accept="image/*">
+    <div id="compress-img-div"></div>
+    <div>
+      <input type="range" min="0" max="1" step="0.001" value="0.800" id="range-quality">
+      <label id="range-quality-label">0.800</label>
+    </div>
+  </section>
+
+<script type="module">
+import { PDFDocument } from "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.esm.min.js";
+
+async function compressPDF(arrayBuffer) {
+  const originalPdf = await PDFDocument.load(arrayBuffer);
+  const newPdf = await PDFDocument.create();
+  
+  const copiedPages = await newPdf.copyPages(originalPdf, originalPdf.getPageIndices());
+  copiedPages.forEach(page => newPdf.addPage(page));
+  
+  const compressedBytes = await newPdf.save({ useObjectStreams: true });
+  
+  return new Blob([compressedBytes], { type: "application/pdf" });
+}
+
+
+function downloadBlob(blob, name = "BLOB") {
+  const url = URL.createObjectURL(blob);
+  //console.log(blob)
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name + "." + blob.type.split("/")[1];
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+const pdfObject = document.querySelector("#pdf");
+pdfObject.addEventListener("change", async (e) => {
+  const files = e.target.files;
+  if(files.length === 0) return;
+  const file = files[0];
+  const buffer = await file.arrayBuffer();
+  const blob = await compressPDF(buffer);
+  downloadBlob(blob, file.name.split(".")[0]);
+})
+
+async function stripMetadataWithCanvas(file, quality = 1.0) {
+  const bitmap = await createImageBitmap(file);
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx = canvas.getContext('2d');
+  
+  ctx.drawImage(bitmap, 0, 0);
+  
+  const blob = await canvas.convertToBlob({ type: file.type, quality });
+  
+  return blob;
+}
+
+
+const metadataImgObject = document.querySelector("#metadata-img");
+metadataImgObject.addEventListener("change", async (e) => {
+  const files = e.target.files;
+  if(files.length === 0) return;
+  const file = files[0];
+  const blob = await stripMetadataWithCanvas(file);
+  downloadBlob(blob, file.name.split(".")[0]);
+})
+
+
+const rangeQuality = document.querySelector("#range-quality");
+const rangeQualityLabel = document.querySelector("#range-quality-label");
+rangeQuality.addEventListener("input", e => {
+  rangeQualityLabel.textContent = Number(e.target.value).toFixed(3);
+})
+
+
+
+async function compressImageWithCanvas(file, { quality = Number(rangeQuality.value), maxDimension = 8192 }) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    quality = Number(rangeQuality.value);
+    
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target.result;
+      
+      const compressImgDiv = document.querySelector("#compress-img-div");
+      compressImgDiv.innerHTML = "";
+      compressImgDiv.append(img);
+      img.style.height = "300px";
+      
+      img.onload = () => {
+        let width = img.naturalWidth;
+        let height = img.naturalHeight;
+        
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        const outputType = file.type === 'image/png' ? 'image/jpeg' : file.type;
+        
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Canvas compression failed.'));
+            }
+          },
+          outputType,
+          quality
+        );
+      };
+      
+      img.onerror = (err) => reject(err);
+    };
+    
+    reader.onerror = (err) => reject(err);
+  });
+}
+
+const compressImgObject = document.querySelector("#compress-img");
+compressImgObject.addEventListener("change", (e) => {
+  const files = e.target.files;
+  if(files.length === 0) return;
+  const file = files[0];
+  compressImageWithCanvas(file, {}).then((blob) => {
+    downloadBlob(blob, file.name.split(".")[0]);
+  }).catch(e => {
+    console.error(e);
+  })
+})
+
+
+</script>
+</body>
+</html>

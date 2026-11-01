@@ -89,7 +89,8 @@ input {
   </div>
   <button id="loadK">Load K</button>
   <button id="copyK">Copy</button>
-  
+  <button id="flipX">fX</button>
+  <button id="flipY">fY</button>
   
   <p style="display:none;"></p>
 </div>
@@ -184,12 +185,14 @@ const elms = {
   showK: document.querySelector("#showK"),
   eraser: document.querySelector("#eraser"),
   loadK: document.querySelector("#loadK"),
-  copyK: document.querySelector("#copyK")
+  copyK: document.querySelector("#copyK"),
+  flipX: document.querySelector("#flipX"),
+  flipY: document.querySelector("#flipY")
 };
 
 elms.showK.addEventListener("click", () => {
   elms.p.style.display = elms.showK.checked ? "block" : "none";
-  if(elms.showK.checked && elms.p.textContent === "") elms.p.textContent = bitmapToK(bitmap);
+  if(elms.showK.checked && elms.p.textContent.length < 2) elms.p.textContent = bitmapToK(bitmap);
 })
 
 
@@ -290,6 +293,40 @@ function completeDraw() {
 
 window.addEventListener("scrollend", () => {
   canvas2Rect = canvas2.getBoundingClientRect();
+})
+
+
+flipX.addEventListener("click", () => {
+  let mid = Math.floor(bitmap.length / 2);
+  for(let i = 1; i <= mid; i++) {
+    const r0 = bitmap[mid - i];
+    bitmap[mid - i] = bitmap[mid + i];
+    bitmap[mid + i] = r0;
+  }
+  
+  completeDraw();
+  elms.p.textContent = bitmapToK(bitmap);
+})
+flipY.addEventListener("click", () => {
+  let temp;
+  for(let i = 0; i < bitmap.length; i++) {
+    const r = bitmap[i];
+    for(let k = 0; k < Math.floor(r.length / 2); k++) {
+      temp = r[k];
+      r[k] = r[r.length - 1 - k];
+      r[r.length - 1 - k] = temp;
+    }
+  }
+  
+  completeDraw();
+  elms.p.textContent = bitmapToK(bitmap);
+})
+
+document.body.addEventListener("dblclick", e => {
+  if(["BUTTON", "CANVAS", "LABEL", "H3"].includes(e.target.tagName)) return;
+  elms.eraser.checked ^= true;
+  navigator.vibrate?.(50);
+  
 })
 
 

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Katawaru</title>
+  <style>
+* {
+  margin: 0;
+  padding: 0;
+  color: #a3f2ff;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+}
+body {
+  background: rgb(0,10,20);
+}
+canvas {
+  display: block;
+  /*border: 1px solid rgba(168,254,251,0.1);*/
+  border-radius: 6px;
+  box-shadow: 0 0 20px rgba(168,254,251,0.1);
+  max-width: 100%;
+  margin: 0 50px;
+  margin: auto;
+}
+input {
+  font-family: Arial, sans-serif;
+  color: #4b5563;
+  font-weight: 700;
+}
+input::file-selector-button {
+  margin-right: 16px;
+  border: none;
+  background: rgb(92,229,225);
+  padding: 10px 20px;
+  border-radius: 8px;
+  color: rgb(0,63,61);
+  cursor: pointer;
+  transition: background .2s ease-in-out;
+}
+input::file-selector-button:hover {
+  background: rgb(183,255,252);
+}
+section {
+  margin-bottom: 24px;
+  width: 90vw;
+  max-width: 960px;
+  margin: auto;
+  padding: 20px;
+}
+#max-pixels {
+  background: rgb(2,14,25);
+  color: rgb(119,212,238);
+  border: 1px solid rgba(173,253,255,0.1);
+  border-radius: 8px;
+  padding: 10px;
+  width: 90px;
+  outline: none;
+}
+  </style>
+</head>
+<body>
+  <section>
+    <h2>Construct</h2>
+    <div>
+      <label for="max-pixels">Max Pixels</label>
+      <input type="text" id="max-pixels" value="8192*4096">
+    </div>
+    <input type="file" id="file-elm" accept="image/*">
+    <canvas id="image-canvas"></canvas>
+    <div id="encoded-div" style="display:none;">
+      <p>Constructed image</p>
+      <canvas id="encoded-canvas"></canvas>
+    </div>
+  </section>
+
+  <section>
+    <h2>Reconstruct</h2>
+    <input type="file" id="encoded-file-elm" accept="image/png">
+    <p id="decode-info"></p>
+    <canvas id="reconstructed-canvas"></canvas>
+  </section>
+<script>
+
+const sel = id => document.querySelector(id);
+const elms = {
+  file: sel("#file-elm"),
+  canvas: sel("#image-canvas"),
+  encoded: sel("#encoded-canvas"),
+  encodedFile: sel("#encoded-file-elm"),
+  reconstructed: sel("#reconstructed-canvas"),
+  info: sel("#decode-info"),
+  encodedDiv: sel("#encoded-div"),
+  maxPixels: sel("#max-pixels")
+};
+
+function evalNumber(text) {
+  text = text.replace(/,/g, "")
+             .replace(/×/g, "*")
+             .replace(/\s/g, "");
+  const val = eval(text);
+  if(isNaN(val)) return 8192*4096;
+  return val;
+}
+
+let MAX_PIXELS = evalNumber(elms.maxPixels.value);
+elms.maxPixels.addEventListener("input", () => {
+  MAX_PIXELS = evalNumber(elms.maxPixels.value);
+});
+const HEADER_BYTES = 16;
+
+const BYTES_PER_PIXEL = 3;
+
+const canvas = elms.canvas;
+canvas.width = 360;
+canvas.height = 400;
+const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+const encCanvas = elms.encoded;
+const encCtx = encCanvas.getContext("2d", { willReadFrequently: true });
+
+const recCanvas = elms.reconstructed;
+const recCtx = recCanvas.getContext("2d");
+
+encCanvas.addEventListener("dblclick", () => downloadCanvasAsBlob(encCanvas));
+recCanvas.addEventListener("dblclick", () => downloadCanvasAsBlob(recCanvas));
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not load image."));
+    };
+    img.src = url;
+  });
+}
+
+function writeUint32(arr, offset, value) {
+  arr[offset]     = (value >>> 24) & 255;
+  arr[offset + 1] = (value >>> 16) & 255;
+  arr[offset + 2] = (value >>> 8) & 255;
+  arr[offset + 3] = value & 255;
+}
+
+function readUint32(arr, offset) {
+  return (
+    ((arr[offset] << 24) |
+     (arr[offset + 1] << 16) |
+     (arr[offset + 2] << 8) |
+      arr[offset + 3]) >>> 0
+  );
+}
+
+
+elms.file.addEventListener("change", async e => {
+  const files = e.target.files;
+  if (files.length === 0) return;
+  const file = files[0];
+  if (!file.type.startsWith("image/")) return;
+
+  try {
+    const img = await loadImageFromFile(file);
+    let w = img.naturalWidth, h = img.naturalHeight;
+
+    if (w * h > MAX_PIXELS) {
+      const scale = Math.sqrt(MAX_PIXELS / (w * h));
+      w = Math.max(1, Math.floor(w * scale));
+      h = Math.max(1, Math.floor(h * scale));
+    }
+
+    canvas.width = w;
+    canvas.height = h;
+    ctx.drawImage(img, 0, 0, w, h);
+    generateEncodedImage();
+  } catch (err) {
+    console.error(err.message);
+  }
+});
+
+function generateEncodedImage() {
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = imageData.data;
+
+  const totalBytes = HEADER_BYTES + pixels.length;
+
+  const N = Math.ceil(totalBytes / BYTES_PER_PIXEL);
+  const encW = Math.ceil(Math.sqrt(N));
+  const encH = Math.ceil(N / encW);
+
+  const header = new Uint8Array(HEADER_BYTES);
+  writeUint32(header, 0, canvas.width);
+  writeUint32(header, 4, canvas.height);
+  writeUint32(header, 8, encW);
+  writeUint32(header, 12, encH);
+
+  encCanvas.width = encW;
+  encCanvas.height = encH;
+  const newData = encCtx.createImageData(encW, encH);
+  const out = newData.data;
+
+  for (let p = 3; p < out.length; p += 4) out[p] = 255;
+
+  let o = 0;
+  let ch = 0; 
+  const put = v => {
+    out[o + ch] = v;
+    if (++ch === BYTES_PER_PIXEL) { ch = 0; o += 4; }
+  };
+  for (let i = 0; i < HEADER_BYTES; i++) put(header[i]);
+  for (let i = 0; i < pixels.length; i++) put(pixels[i]);
+
+  encCtx.putImageData(newData, 0, 0);
+  elms.encodedDiv.style.display = "block";
+}
+
+elms.encodedFile.addEventListener("change", async e => {
+  const files = e.target.files;
+  if (files.length === 0) return;
+  const file = files[0];
+  if (!file.type.startsWith("image/")) return;
+
+  try {
+    const img = await loadImageFromFile(file);
+    reconstructImage(img);
+  } catch (err) {
+    elms.info.textContent = "Error: " + err.message;
+  }
+});
+
+function reconstructImage(img) {
+  const encW = img.naturalWidth, encH = img.naturalHeight;
+
+  const tmp = document.createElement("canvas");
+
+  tmp.width = encW;
+  tmp.height = encH;
+  const tctx = tmp.getContext("2d", { willReadFrequently: true });
+  tctx.drawImage(img, 0, 0);
+  const src = tctx.getImageData(0, 0, encW, encH).data;
+
+  const totalBytes = encW * encH * BYTES_PER_PIXEL;
+  if (totalBytes < HEADER_BYTES) {
+    throw new Error("Image is too small to be a valid encoded image.");
+  }
+
+  const header = new Uint8Array(HEADER_BYTES);
+  for (let b = 0; b < HEADER_BYTES; b++) {
+    header[b] = src[Math.floor(b / BYTES_PER_PIXEL) * 4 + (b % BYTES_PER_PIXEL)];
+  }
+
+  const imgW = readUint32(header, 0);
+  const imgH = readUint32(header, 4);
+  const hdrEncW = readUint32(header, 8);
+  const hdrEncH = readUint32(header, 12);
+
+  if (hdrEncW !== encW || hdrEncH !== encH) {
+    throw new Error(
+      `Header mismatch: header says ${hdrEncW}x${hdrEncH}, file is ${encW}x${encH}. ` +
+      `The image may have been resized or is not an encoded image.`
+    );
+  }
+  if (imgW === 0 || imgH === 0 || HEADER_BYTES + imgW * imgH * 4 > totalBytes) {
+    throw new Error("Invalid header: image dimensions do not fit the data.");
+  }
+
+  const rgba = new Uint8ClampedArray(imgW * imgH * 4);
+  let ch = HEADER_BYTES % BYTES_PER_PIXEL;
+  let p = Math.floor(HEADER_BYTES / BYTES_PER_PIXEL) * 4;
+  for (let o = 0; o < rgba.length; o++) {
+    rgba[o] = src[p + ch];
+    if (++ch === BYTES_PER_PIXEL) { ch = 0; p += 4; }
+  }
+
+  recCanvas.width = imgW;
+  recCanvas.height = imgH;
+  recCtx.putImageData(new ImageData(rgba, imgW, imgH), 0, 0);
+
+  elms.info.textContent =
+    `Original: ${imgW}x${imgH}px | Encoded: ${encW}x${encH}px`;
+}
+
+function getDateTime() {
+  const d = new Date();
+
+  const pad = n => String(n).padStart(2, '0');
+
+  return (
+    pad(d.getDate()) +
+    pad(d.getMonth() + 1) +
+    d.getFullYear() +
+    pad(d.getHours()) +
+    pad(d.getMinutes())
+  );
+}
+
+function downloadCanvasAsBlob(cvs) {
+  cvs.toBlob((blob) => {
+    if (!blob) return;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Katawaru${getDateTime()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, "image/png");
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Himitsu v1</title>
+  <style>
+* {
+  margin: 0;
+  padding: 0;
+  color: #a3f2ff;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+}
+body {
+  background: rgb(0,10,20);
+}
+canvas {
+  min-width: 300px;
+  max-width: 320px;
+  display: block;
+  margin: auto;
+  image-rendering: pixelated;
+  box-shadow: 0 0 20px rgba(255,255,255,0.15);
+  border: 1px solid rgb(141,218,224,0.2);
+  border-radius: 10px;
+}
+input {
+  font-family: Arial, sans-serif;
+  color: #4b5563;
+  font-weight: 700;
+}
+input::file-selector-button {
+  margin-right: 16px;
+  border: none;
+  background: rgb(92,229,225);
+  padding: 10px 20px;
+  border-radius: 8px;
+  color: rgb(0,63,61);
+  cursor: pointer;
+  transition: background .2s ease-in-out;
+}
+input::file-selector-button:hover {
+  background: rgb(183,255,252);
+}
+section {
+  margin-bottom: 24px;
+  width: 90vw;
+  max-width: 960px;
+  margin: auto;
+  padding: 20px;
+}
+button {
+  background: rgb(92,229,225);
+  color: rgb(0,63,61);
+  border: none;
+  padding: 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+textarea {
+  outline: none;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  min-width: 100%;
+  max-width: 100%;
+  padding: 10px;
+  font-family: serif;
+  border: 2px solid rgb(45,60,64);
+}
+textarea::placeholder {
+  color: rgb(209,244,253);
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow-x: auto;
+}
+  </style>
+</head>
+<body>
+
+<section>
+  <h3 style="margin-top:12px;">Encrypt Text</h3>
+  <textarea name="encrypt-text" id="encrypt-text" cols="30" rows="10" placeholder="Paste or write your text here to encrypt..."></textarea>
+  <button id="encrypt">Encrypt</button>
+  <button id="download">Download</button>
+  
+  <h3 style="margin-top:40px;">Encrypted Image</h3>
+  <canvas id="myCanvas"></canvas>
+  
+  <h3 style="margin-top:40px;" id="copy-decoded-text">Decoded Text</h3>
+  <input type="file" accept="image/*" id="decode">
+  <pre id="decoded-text"></pre>
+</section>
+
+
+<script>
+
+async function encrypt(txt, key) {
+
+  const encoder = new TextEncoder();
+  const buffer = encoder.encode(txt);
+
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    buffer
+  );
+
+  const combinedBuffer = new Uint8Array(
+    iv.length + encryptedBuffer.byteLength
+  );
+
+  combinedBuffer.set(iv, 0);
+  combinedBuffer.set(new Uint8Array(encryptedBuffer), iv.length);
+
+  return combinedBuffer;
+}
+
+
+async function decrypt(combinedBuffer, key) {
+
+  const decoder = new TextDecoder();
+
+  const receivedBytes = new Uint8Array(combinedBuffer);
+
+  const iv = receivedBytes.slice(0, 12);
+  const ciphertext = receivedBytes.slice(12);
+
+  const decryptedBuffer = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    ciphertext
+  );
+
+  return decoder.decode(decryptedBuffer);
+}
+
+
+async function generateKey() {
+  return await crypto.subtle.generateKey(
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+}
+async function exportKey(key) {
+  const rawKey = await crypto.subtle.exportKey("raw", key);
+  const bytes = new Uint8Array(rawKey);
+
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  
+  return btoa(binary);
+}
+async function importKey(base64) {
+  const binary = atob(base64);
+
+  const bytes = Uint8Array.from(
+    binary,
+    char => char.charCodeAt(0)
+  );
+
+  return await crypto.subtle.importKey(
+    "raw",
+    bytes,
+    { name: "AES-GCM" },
+    true,
+    ["encrypt", "decrypt"]
+  );
+}
+
+
+
+const input = document.querySelector("#encrypt-text");
+const submit = document.querySelector("#encrypt");
+
+
+
+submit.addEventListener("click", async (e) => {
+  
+  const key = await generateKey();
+  
+  const bitstream = await encrypt(input.value, key);
+  const base64 = await exportKey(key);
+  const keyBuffer = Uint8Array.fromBase64(base64);
+  const buffer = new Uint8Array(bitstream.length + keyBuffer.length + 1);
+  buffer.set(new Uint8Array([keyBuffer.length]), 0);
+  buffer.set(keyBuffer, 1);
+  buffer.set(bitstream, keyBuffer.length + 1);
+  
+  const canvas = document.querySelector("#myCanvas");
+  const blob = await bytesToImageBlob(buffer, canvas);
+  
+})
+
+const downloadBtn = document.querySelector("#download");
+downloadBtn.addEventListener("click", () => {
+  const canvas = document.querySelector("#myCanvas");
+  downloadCanvasAsBlob(canvas);
+  //const blob = new Blob([KEY], { type: 'text/plain;charset=utf-8' });
+  //downloadBlob(blob);
+})
+
+const decodeObject = document.querySelector("#decode");
+const decodedTextElm = document.querySelector("#decoded-text");
+decodeObject.addEventListener("change", async (e) => {
+  const files = e.target.files;
+  if(files.length === 0) return;
+  const file = files[0];
+  const buffer = await imageBlobToBytes(file);
+  const keyBufferLength = buffer[0];
+  const keyBuffer = buffer.slice(1, keyBufferLength + 1);
+  const bitstream = buffer.slice(keyBufferLength + 1);
+  
+  const key = await importKey(keyBuffer.toBase64());
+  const result = await decrypt(bitstream, key);
+  console.log(result)
+  decodedTextElm.innerHTML = result;
+  
+})
+
+
+
+const HEADER_BYTES = 4;
+
+function makeCanvas(width, height) {
+  if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(width, height);
+  const c = document.createElement("canvas");
+  c.width = width;
+  c.height = height;
+  return c;
+}
+
+async function canvasToBlob(canvas) {
+  if (canvas.convertToBlob) return canvas.convertToBlob({ type: "image/png" });
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png")
+  );
+}
+
+async function bytesToImageBlob(bytes, canvas) {
+  if (!(bytes instanceof Uint8Array)) throw new TypeError("Expected a Uint8Array");
+  if (bytes.length > 0xffffffff) throw new RangeError("Array too large");
+
+  const totalBytes = HEADER_BYTES + bytes.length;
+  const pixelCount = Math.ceil(totalBytes / 3);
+  const width = Math.ceil(Math.sqrt(pixelCount));
+  const height = Math.ceil(pixelCount / width);
+
+  const stream = new Uint8Array(pixelCount * 3);
+  new DataView(stream.buffer).setUint32(0, bytes.length, false);
+  stream.set(bytes, HEADER_BYTES);
+
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  for (let p = 0, s = 0, o = 0; p < width * height; p++, s += 3, o += 4) {
+    rgba[o] = stream[s] ?? 0;
+    rgba[o + 1] = stream[s + 1] ?? 0;
+    rgba[o + 2] = stream[s + 2] ?? 0;
+    rgba[o + 3] = 255;
+  }
+
+  //const canvas = makeCanvas(width, height);
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.putImageData(new ImageData(rgba, width, height), 0, 0);
+  return canvasToBlob(canvas);
+}
+
+
+async function imageBlobToBytes(blob) {
+  const bitmap = await createImageBitmap(blob, { colorSpaceConversion: "none" });
+  const { width, height } = bitmap;
+
+  const canvas = makeCanvas(width, height);
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close?.();
+
+  const rgba = ctx.getImageData(0, 0, width, height).data;
+
+  const stream = new Uint8Array(width * height * 3);
+  for (let p = 0, s = 0, o = 0; p < width * height; p++, s += 3, o += 4) {
+    stream[s] = rgba[o];
+    stream[s + 1] = rgba[o + 1];
+    stream[s + 2] = rgba[o + 2];
+  }
+
+  const length = new DataView(stream.buffer).getUint32(0, false);
+  if (length > stream.length - HEADER_BYTES) throw new Error("Invalid image: bad length header");
+  return stream.slice(HEADER_BYTES, HEADER_BYTES + length);
+}
+
+function downloadCanvasAsBlob(cvs) {
+  cvs.toBlob((blob) => {
+    if (!blob) return;
+    downloadBlob(blob);
+  }, "image/png");
+}
+
+function getDateTime() {
+  const d = new Date();
+
+  const pad = n => String(n).padStart(2, '0');
+
+  return (
+    pad(d.getDate()) +
+    pad(d.getMonth() + 1) +
+    d.getFullYear() +
+    pad(d.getHours()) +
+    pad(d.getMinutes())
+  );
+}
+
+function downloadBlob(blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Himitsu${getDateTime()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function copyTextToClipboard(text) {
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      //console.log('Text successfully copied to clipboard');
+    })
+    .catch(err => {
+      console.error('Failed to copy text: ', err);
+    });
+}
+
+document.querySelector("#copy-decoded-text").addEventListener("dblclick", () => {
+  copyTextToClipboard(decodedTextElm.textContent);
+})
+
+
+</script>
+</body>
+</html>
