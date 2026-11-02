@@ -72,9 +72,10 @@ textarea::placeholder {
   color: rgb(209,244,253);
 }
 pre {
+  font-family: Sans-Serif;
   white-space: pre-wrap;
   overflow-wrap: break-word;
-  overflow-x: auto;
+  /*overflow-x: auto;*/
 }
   </style>
 </head>
@@ -340,7 +341,7 @@ function copyTextToClipboard(text) {
 }
 
 document.querySelector("#copy-decoded-text").addEventListener("dblclick", () => {
-  copyTextToClipboard(decodedTextElm.textContent);
+  copyTextToClipboard(decodedTextElm.innerHTML);
 })
 
 
